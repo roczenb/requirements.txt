@@ -1,3 +1,4 @@
+print("--- THE BOT IS STARTING UP PERFECTLY ---")
 import os
 import sqlite3
 import discord

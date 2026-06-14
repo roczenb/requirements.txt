@@ -398,3 +398,4 @@ async def update_scores_slash(interaction: discord.Interaction):
 
 # Use this instead of pasting your real token here!
 TOKEN = os.environ.get('DISCORD_TOKEN')
+bot.run(TOKEN)

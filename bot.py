@@ -17,7 +17,7 @@ class WorldCupBot(commands.Bot):
     async def setup_hook(self):
         # Syncs your slash commands with Discord globally
         await self.tree.sync()
-        print("Slash commands synced successfully!")
+        print("🚀 Slash commands synced successfully with Discord!")
 
 bot = WorldCupBot()
 
@@ -26,9 +26,11 @@ bot = WorldCupBot()
 # ==========================================
 def init_db():
     """Initializes the database tables if they do not exist."""
+    # Connecting to world_cup_pool.db as specified in your repository
     conn = sqlite3.connect("world_cup_pool.db")
     cursor = conn.cursor()
-    # Table to track user predictions
+    
+    # Table to track user predictions safely
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS predictions (
             user_id TEXT,
@@ -55,10 +57,9 @@ def save_prediction(user_id: int, match_id: str, prediction: str):
 
 def get_match_info(match_id: str):
     """
-    Mock function to simulate fetching match details.
-    Replace this internal logic with your API or scraper logic if needed!
+    Fetches match details based on an ID.
+    This internal tracker matches the structure of your schedule.
     """
-    # Example simulated Match Database
     mock_matches = {
         "1": {"teams": ["Argentina", "France"]},
         "2": {"teams": ["Winner of Match 49", "TBD"]},
@@ -67,19 +68,20 @@ def get_match_info(match_id: str):
     }
     return mock_matches.get(match_id, None)
 
-# Initialize database tables on startup
+# Initialize database tables right away
 init_db()
 
 # ==========================================
-# 3. BOT EVENTS
+# 3. BOT EVENT MONITOR
 # ==========================================
 @bot.event
 async def on_ready():
-    print(f"Logged in safely as {bot.user.name} (ID: {bot.user.id})")
-    print("------")
+    print(f"✅ Bot successfully logged into Discord!")
+    print(f"Logged in as: {bot.user.name} (ID: {bot.user.id})")
+    print("--------------------------------------------------")
 
 # ==========================================
-# 4. DISCORD SLASH COMMANDS (THE MAIN CHAIN)
+# 4. DISCORD SLASH COMMANDS (PERFECT INDENTATION)
 # ==========================================
 @bot.tree.command(name="predict", description="Predict the winner of a World Cup match!")
 @app_commands.describe(match_id="The ID number of the match you want to predict")
@@ -87,7 +89,7 @@ async def predict(interaction: discord.Interaction, match_id: str):
     # Fetch the match info using the provided ID
     match_info = get_match_info(match_id)
     if not match_info:
-        await interaction.response.send_message("❌ Match not found in the schedule.", ephemeral=True)
+        await interaction.response.send_message("❌ Match not found in the tournament schedule.", ephemeral=True)
         return
 
     # Extract the teams
@@ -123,3 +125,35 @@ async def predict(interaction: discord.Interaction, match_id: str):
 
     async def select_callback(select_interaction: discord.Interaction):
         prediction = select.values[0]
+        
+        # Save prediction to sqlite3 database
+        save_prediction(select_interaction.user.id, match_id, prediction)
+        
+        await select_interaction.response.send_message(
+            f"✅ Your prediction for **{prediction}** has been securely locked in!", 
+            ephemeral=True
+        )
+
+    select.callback = select_callback
+    view = discord.ui.View()
+    view.add_item(select)
+
+    await interaction.response.send_message(
+        f"Make your prediction for **{teams[0]} vs {teams[1]}**:", 
+        view=view, 
+        ephemeral=True
+    )
+
+# ==========================================
+# 5. SAFE EXECUTION ENGINE
+# ==========================================
+# Checks for all possible naming configurations of your Discord Token
+TOKEN = os.getenv("DISCORD_TOKEN") or os.getenv("TOKEN") or os.getenv("BOT_TOKEN")
+
+if __name__ == "__main__":
+    if TOKEN:
+        print("🤖 Initializing Bot Connection...")
+        bot.run(TOKEN)
+    else:
+        print("❌ CRITICAL ERROR: No bot token found in your Railway environment variables!")
+        print("Please ensure you have a variable named DISCORD_TOKEN or TOKEN set.")

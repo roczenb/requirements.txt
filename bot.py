@@ -394,5 +394,7 @@ async def update_scores_slash(interaction: discord.Interaction):
     conn.commit()
     await interaction.followup.send("🔄 **Leaderboard calculation complete for this server!**", ephemeral=True)
 
-# Start the bot
-bot.run("MTUxNTQ0NDY2MjY0OTc0OTcwNw.Gl6R6q.J68yWbbvTPw9pofd_Tw-e5E_47LPuIDEdF0tqo")
+#
+
+# Use this instead of pasting your real token here!
+TOKEN = os.environ.get('DISCORD_TOKEN')

@@ -461,4 +461,5 @@ async def update_scores_slash(interaction: discord.Interaction):
     await interaction.followup.send("🔄 **Leaderboard calculation complete for this server!**", ephemeral=True)
 
 # Start the bot using your secure token
-bot.run("MTUxNTQ0NDY2MjY0OTc0OTcwNw.Gl6R6q.J68yWbbvTPw9pofd_Tw-e5E_47LPuIDEdF0tqo")
+# Start the bot using your secure token look-up
+bot.run(TOKEN)

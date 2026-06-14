@@ -237,7 +237,7 @@ class MatchDropdown(discord.ui.Select):
         if not match_info: return
             
         teams = match_info["teams"]
-     teams = match_info["teams"]
+teams = match_info["teams"]
         options = [
             discord.SelectOption(label=f"🥇 Winner: {teams[0]}", value=teams[0]),
             discord.SelectOption(label=f"🥈 Winner: {teams[1]}", value=teams[1])

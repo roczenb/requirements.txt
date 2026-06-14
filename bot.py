@@ -462,4 +462,18 @@ async def update_scores_slash(interaction: discord.Interaction):
 
 # Start the bot using your secure token
 # Start the bot using your secure token look-up
+# ==========================================
+# 5. SAFE BOT INITIATION
+# ==========================================
+# This looks up the variable you assigned inside your Railway environment panels
+TOKEN = os.getenv("DISCORD_TOKEN") or os.getenv("TOKEN") or os.getenv("BOT_TOKEN")
+
+if __name__ == "__main__":
+    if TOKEN:
+        print("🤖 Booting up bot application streams...")
+        bot.run(TOKEN)
+    else:
+        print("❌ CRITICAL SETUP ERROR: No Discord Bot Token found!")
+        print("Please add a variable named DISCORD_TOKEN inside your Railway environment panels.")
+
 bot.run(TOKEN)

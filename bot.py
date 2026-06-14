@@ -1,4 +1,3 @@
-print("--- THE BOT IS STARTING UP PERFECTLY ---")
 import os
 import sqlite3
 import discord
@@ -35,6 +34,46 @@ cursor.execute(f"""
     )
 """)
 conn.commit()
+
+from discord.ext import tasks
+
+# Define a loop that runs every 60 minutes
+@tasks.loop(minutes=60)
+async def auto_update_matches():
+    print("🔄 Checking for tournament updates...")
+    
+    # 1. Scrape or request live tournament match lists
+    url = "YOUR_TOURNAMENT_URL_HERE"
+    response = requests.get(url)
+    soup = BeautifulSoup(response.text, 'html.parser')
+    
+    # (Extract updated match data here based on the website's structure)
+    # Example mock data from the web scraper loop:
+    fetched_matches = [
+        {"id": 1, "home": "Sentinels", "away": "Fnatic"},
+        {"id": 2, "home": "Winner of Match 1", "away": "TBD"}
+    ]
+    
+    # 2. Connect to database and update names dynamically
+    conn = sqlite3.connect("tournament.db")
+    cursor = conn.cursor()
+    
+    for match in fetched_matches:
+        cursor.execute("""
+            UPDATE matches 
+            SET home_team = ?, away_team = ? 
+            WHERE id = ?
+        """, (match["home"], match["away"], match["id"]))
+        
+    conn.commit()
+    conn.close()
+    print("✅ Database updated with latest bracket names!")
+
+# Fire up the loop the moment the bot logs into Discord
+@bot.event
+async def on_ready():
+    print(f"Logged in as {bot.user}")
+    auto_update_matches.start() # Starts the automatic loop
 
 # --- 📅 OFFICIAL 104-MATCH DATASET WITH TIME-LOCK TIMESTAMPS ---
 MATCHES = {
@@ -198,9 +237,13 @@ class MatchDropdown(discord.ui.Select):
         if not match_info: return
             
         teams = match_info["teams"]
+     teams = match_info["teams"]
         options = [
             discord.SelectOption(label=f"🥇 Winner: {teams[0]}", value=teams[0]),
             discord.SelectOption(label=f"🥈 Winner: {teams[1]}", value=teams[1])
+        ]
+        if match_info["allow_tie"]:
+            options.append(discord.SelectOption(label="🤝 Tie Game", 
         ]
         if match_info["allow_tie"]:
             options.append(discord.SelectOption(label="🤝 Tie Game", value="Tie"))
@@ -395,8 +438,5 @@ async def update_scores_slash(interaction: discord.Interaction):
     conn.commit()
     await interaction.followup.send("🔄 **Leaderboard calculation complete for this server!**", ephemeral=True)
 
-#
-
-# Use this instead of pasting your real token here!
-TOKEN = os.environ.get('DISCORD_TOKEN')
-bot.run(TOKEN)
+# Start the bot
+bot.run("MTUxNTQ0NDY2MjY0OTc0OTcwNw.Gl6R6q.J68yWbbvTPw9pofd_Tw-e5E_47LPuIDEdF0tqo")

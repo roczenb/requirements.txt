@@ -6,6 +6,7 @@ from discord.ext import commands, tasks
 import requests
 from bs4 import BeautifulSoup
 from datetime import datetime, timezone
+import asyncio
 
 # --- 🤖 BOT INITIALIZATION & INTENTS ---
 intents = discord.Intents.default()
@@ -32,43 +33,6 @@ cursor.execute(f"""
     )
 """)
 conn.commit()
-
-# Define a loop that runs every 60 minutes
-@tasks.loop(minutes=60)
-async def auto_update_matches():
-    print("🔄 Checking for tournament updates...")
-    
-    url = "https://www.theguardian.com/football/world-cup-2026-fixtures"
-    try:
-        response = requests.get(url, headers={"User-Agent": "Mozilla/5.0"})
-        soup = BeautifulSoup(response.text, 'html.parser')
-    except Exception as e:
-        print(f"Update Loop Notice: {e}")
-        return
-    
-    fetched_matches = [
-        {"id": 1, "home": "Sentinels", "away": "Fnatic"},
-        {"id": 2, "home": "Winner of Match 1", "away": "TBD"}
-    ]
-    
-    # Check if tournament.db is actively used/exists before attempting update
-    if os.path.exists("tournament.db"):
-        try:
-            temp_conn = sqlite3.connect("tournament.db")
-            temp_cursor = temp_conn.cursor()
-            
-            for match in fetched_matches:
-                temp_cursor.execute("""
-                    UPDATE matches 
-                    SET home_team = ?, away_team = ? 
-                    WHERE id = ?
-                """, (match["home"], match["away"], match["id"]))
-                
-            temp_conn.commit()
-            temp_conn.close()
-            print("✅ Database updated with latest bracket names!")
-        except Exception as e:
-            print(f"Tournament DB Update Notice: {e}")
 
 # --- 📅 OFFICIAL 104-MATCH DATASET WITH TIME-LOCK TIMESTAMPS ---
 MATCHES = {
@@ -190,11 +154,15 @@ MATCHES = {
 }
 
 # --- 📊 MASTER RESULTS ANSWER KEY ---
+MANUAL_RESULTS = {1: "Mexico", 2: "South Korea", 3: "Tie", 4: "USA", 5: "Tie"}
+LIVE_RESULTS = {}
+LIVE_RESULTS.update(MANUAL_RESULTS)
+
 def fetch_live_world_cup_results():
     automated_results = {}
     try:
         url = "https://www.theguardian.com/football/world-cup-2026-fixtures"
-        response = requests.get(url, headers={"User-Agent": "Mozilla/5.0"})
+        response = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=5)
         soup = BeautifulSoup(response.text, 'html.parser')
         matches = soup.find_all('div', class_='football-match')
         
@@ -220,10 +188,40 @@ def fetch_live_world_cup_results():
         print(f"Scraper delay notice: {e}")
     return automated_results
 
-MANUAL_RESULTS = {1: "Mexico", 2: "South Korea", 3: "Tie", 4: "USA", 5: "Tie"}
-LIVE_RESULTS = {}
-LIVE_RESULTS.update(MANUAL_RESULTS)
-LIVE_RESULTS.update(fetch_live_world_cup_results())
+# Define a loop that runs every 60 minutes
+@tasks.loop(minutes=60)
+async def auto_update_matches():
+    print("🔄 Checking for tournament updates...")
+    
+    # Offload the blocking web scraper request to a separate worker thread
+    loop = asyncio.get_event_loop()
+    scraped_data = await loop.run_in_executor(None, fetch_live_world_cup_results)
+    if scraped_data:
+        LIVE_RESULTS.update(scraped_data)
+        print(f"✅ Live match results dictionary re-synchronized! ({len(LIVE_RESULTS)} matches cached)")
+    
+    fetched_matches = [
+        {"id": 1, "home": "Sentinels", "away": "Fnatic"},
+        {"id": 2, "home": "Winner of Match 1", "away": "TBD"}
+    ]
+    
+    if os.path.exists("tournament.db"):
+        try:
+            temp_conn = sqlite3.connect("tournament.db")
+            temp_cursor = temp_conn.cursor()
+            
+            for match in fetched_matches:
+                temp_cursor.execute("""
+                    UPDATE matches 
+                    SET home_team = ?, away_team = ? 
+                    WHERE id = ?
+                """, (match["home"], match["away"], match["id"]))
+                
+            temp_conn.commit()
+            temp_conn.close()
+            print("✅ Database updated with latest bracket names!")
+        except Exception as e:
+            print(f"Tournament DB Update Notice: {e}")
 
 # --- 🎛️ INTERACTIVE INTERFACE COMPONENTS ---
 class MatchDropdown(discord.ui.Select):
@@ -313,11 +311,12 @@ class BracketSubmissionView(discord.ui.View):
             if match_num in MATCHES:
                 self.add_item(MatchDropdown(match_num))
 
-# --- 🔄 SYNC SLASH COMMANDS ON STARTUP ---
+# --- 🔄 ON READY EVENT ---
 @bot.event
 async def on_ready():
     print(f"🥇 Bot logged in as {bot.user}")
     
+    # Safely start background tasks
     if not auto_update_matches.is_running():
         auto_update_matches.start()
         
@@ -332,7 +331,7 @@ async def on_ready():
 @bot.tree.command(name="predict", description="Submit your World Cup predictions in groups of 5 matches.")
 @app_commands.describe(section="The section number you want to guess (1 through 21)")
 async def predict_slash(interaction: discord.Interaction, section: int = 1):
-    # ⏱️ IMMEDIATE DEFERRAL CRITICAL FIX: Stops the Discord 3-second timeout clock completely!
+    # ⏱️ IMMEDIATE DEFERRAL: This stops the 3-second timer.
     await interaction.response.defer(ephemeral=False)
     
     games_per_section = 5
@@ -347,7 +346,6 @@ async def predict_slash(interaction: discord.Interaction, section: int = 1):
         
     view = BracketSubmissionView(start_game, end_game)
     
-    # Send using interaction.followup since we deferred
     await interaction.followup.send(
         content=(
             f"🏆 **World Cup Predictions: Matches {start_game} to {end_game}**\n"

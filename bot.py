@@ -13,76 +13,164 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 # --- 🗄️ DATABASE SETUP ---
 DB_PATH = "/data/predictions.db" if os.path.exists("/data") else "predictions.db"
 
-conn = sqlite3.connect(DB_PATH)
-cursor = conn.cursor()
+def init_db():
+    local_conn = sqlite3.connect(DB_PATH)
+    local_cursor = local_conn.cursor()
+    columns = [f"m_{i} TEXT" for i in range(1, 105)]
+    columns_sql = ", ".join(columns)
+    local_cursor.execute(f"""
+        CREATE TABLE IF NOT EXISTS brackets (
+            user_id INTEGER,
+            server_id INTEGER,
+            username TEXT,
+            score INTEGER DEFAULT 0,
+            {columns_sql},
+            PRIMARY KEY (user_id, server_id)
+        )
+    """)
+    local_conn.commit()
+    local_conn.close()
 
-columns = [f"m_{i} TEXT" for i in range(1, 105)]
-columns_sql = ", ".join(columns)
-
-cursor.execute(f"""
-    CREATE TABLE IF NOT EXISTS brackets (
-        user_id INTEGER,
-        server_id INTEGER,
-        username TEXT,
-        score INTEGER DEFAULT 0,
-        {columns_sql},
-        PRIMARY KEY (user_id, server_id)
-    )
-""")
-conn.commit()
+init_db()
 
 # --- 📅 OFFICIAL REAL-WORLD 2026 FIFA WORLD CUP FIXTURES (1-104) ---
 MATCHES = {
+    # --- GROUP STAGE: ROUND 1 ---
     1: {"teams": ["Mexico", "South Africa"], "allow_tie": True, "kickoff": datetime(2026, 6, 11, 19, 0, tzinfo=timezone.utc)},
     2: {"teams": ["South Korea", "Czechia"], "allow_tie": True, "kickoff": datetime(2026, 6, 12, 2, 0, tzinfo=timezone.utc)},
     3: {"teams": ["Canada", "Bosnia and Herzegovina"], "allow_tie": True, "kickoff": datetime(2026, 6, 12, 19, 0, tzinfo=timezone.utc)},
     4: {"teams": ["USA", "Paraguay"], "allow_tie": True, "kickoff": datetime(2026, 6, 13, 1, 0, tzinfo=timezone.utc)},
-    5: {"teams": ["Brazil", "Morocco"], "allow_tie": True, "kickoff": datetime(2026, 6, 13, 19, 0, tzinfo=timezone.utc)},
+    5: {"teams": ["Haiti", "Scotland"], "allow_tie": True, "kickoff": datetime(2026, 6, 13, 19, 0, tzinfo=timezone.utc)},
     6: {"teams": ["Australia", "Türkiye"], "allow_tie": True, "kickoff": datetime(2026, 6, 13, 19, 0, tzinfo=timezone.utc)},
-    7: {"teams": ["Haiti", "Scotland"], "allow_tie": True, "kickoff": datetime(2026, 6, 13, 22, 0, tzinfo=timezone.utc)},
+    7: {"teams": ["Brazil", "Morocco"], "allow_tie": True, "kickoff": datetime(2026, 6, 13, 22, 0, tzinfo=timezone.utc)},
     8: {"teams": ["Qatar", "Switzerland"], "allow_tie": True, "kickoff": datetime(2026, 6, 13, 22, 0, tzinfo=timezone.utc)},
     9: {"teams": ["Germany", "Curaçao"], "allow_tie": True, "kickoff": datetime(2026, 6, 14, 17, 0, tzinfo=timezone.utc)},
-    10: {"teams": ["Ivory Coast", "Ecuador"], "allow_tie": True, "kickoff": datetime(2026, 6, 14, 20, 0, tzinfo=timezone.utc)},
-    11: {"teams": ["Netherlands", "Japan"], "allow_tie": True, "kickoff": datetime(2026, 6, 14, 20, 0, tzinfo=timezone.utc)},
-    12: {"teams": ["Tunisia", "Sweden"], "allow_tie": True, "kickoff": datetime(2026, 6, 15, 2, 0, tzinfo=timezone.utc)},
+    10: {"teams": ["Netherlands", "Japan"], "allow_tie": True, "kickoff": datetime(2026, 6, 14, 20, 0, tzinfo=timezone.utc)},
+    11: {"teams": ["Ivory Coast", "Ecuador"], "allow_tie": True, "kickoff": datetime(2026, 6, 14, 20, 0, tzinfo=timezone.utc)},
+    12: {"teams": ["Sweden", "Tunisia"], "allow_tie": True, "kickoff": datetime(2026, 6, 15, 2, 0, tzinfo=timezone.utc)},
     13: {"teams": ["Spain", "Cabo Verde"], "allow_tie": True, "kickoff": datetime(2026, 6, 15, 16, 0, tzinfo=timezone.utc)},
-    14: {"teams": ["Saudi Arabia", "Uruguay"], "allow_tie": True, "kickoff": datetime(2026, 6, 15, 19, 0, tzinfo=timezone.utc)},
-    15: {"teams": ["Belgium", "Egypt"], "allow_tie": True, "kickoff": datetime(2026, 6, 15, 22, 0, tzinfo=timezone.utc)},
+    14: {"teams": ["Belgium", "Egypt"], "allow_tie": True, "kickoff": datetime(2026, 6, 15, 19, 0, tzinfo=timezone.utc)},
+    15: {"teams": ["Saudi Arabia", "Uruguay"], "allow_tie": True, "kickoff": datetime(2026, 6, 15, 22, 0, tzinfo=timezone.utc)},
+    16: {"teams": ["Iran", "New Zealand"], "allow_tie": True, "kickoff": datetime(2026, 6, 16, 1, 0, tzinfo=timezone.utc)},
+    17: {"teams": ["France", "Senegal"], "allow_tie": True, "kickoff": datetime(2026, 6, 16, 19, 0, tzinfo=timezone.utc)},
+    18: {"teams": ["Iraq", "Norway"], "allow_tie": True, "kickoff": datetime(2026, 6, 16, 22, 0, tzinfo=timezone.utc)},
+    19: {"teams": ["Argentina", "Algeria"], "allow_tie": True, "kickoff": datetime(2026, 6, 17, 1, 0, tzinfo=timezone.utc)},
+    20: {"teams": ["Austria", "Jordan"], "allow_tie": True, "kickoff": datetime(2026, 6, 17, 4, 0, tzinfo=timezone.utc)},
+    21: {"teams": ["Portugal", "Congo DR"], "allow_tie": True, "kickoff": datetime(2026, 6, 17, 17, 0, tzinfo=timezone.utc)},
+    22: {"teams": ["England", "Croatia"], "allow_tie": True, "kickoff": datetime(2026, 6, 17, 20, 0, tzinfo=timezone.utc)},
+    23: {"teams": ["Ghana", "Panama"], "allow_tie": True, "kickoff": datetime(2026, 6, 17, 23, 0, tzinfo=timezone.utc)},
+    24: {"teams": ["Uzbekistan", "Colombia"], "allow_tie": True, "kickoff": datetime(2026, 6, 18, 2, 0, tzinfo=timezone.utc)},
+
+    # --- GROUP STAGE: ROUND 2 ---
+    25: {"teams": ["Czechia", "South Africa"], "allow_tie": True, "kickoff": datetime(2026, 6, 18, 16, 0, tzinfo=timezone.utc)},
+    26: {"teams": ["Switzerland", "Bosnia and Herzegovina"], "allow_tie": True, "kickoff": datetime(2026, 6, 18, 19, 0, tzinfo=timezone.utc)},
+    27: {"teams": ["Canada", "Qatar"], "allow_tie": True, "kickoff": datetime(2026, 6, 18, 22, 0, tzinfo=timezone.utc)},
+    28: {"teams": ["Mexico", "South Korea"], "allow_tie": True, "kickoff": datetime(2026, 6, 19, 1, 0, tzinfo=timezone.utc)},
+    29: {"teams": ["Brazil", "Haiti"], "allow_tie": True, "kickoff": datetime(2026, 6, 19, 16, 0, tzinfo=timezone.utc)},
+    30: {"teams": ["Scotland", "Morocco"], "allow_tie": True, "kickoff": datetime(2026, 6, 19, 19, 0, tzinfo=timezone.utc)},
+    31: {"teams": ["Türkiye", "Paraguay"], "allow_tie": True, "kickoff": datetime(2026, 6, 19, 22, 0, tzinfo=timezone.utc)},
+    32: {"teams": ["USA", "Australia"], "allow_tie": True, "kickoff": datetime(2026, 6, 20, 1, 0, tzinfo=timezone.utc)},
+    33: {"teams": ["Germany", "Ivory Coast"], "allow_tie": True, "kickoff": datetime(2026, 6, 20, 17, 0, tzinfo=timezone.utc)},
+    34: {"teams": ["Ecuador", "Curaçao"], "allow_tie": True, "kickoff": datetime(2026, 6, 20, 20, 0, tzinfo=timezone.utc)},
+    35: {"teams": ["Netherlands", "Sweden"], "allow_tie": True, "kickoff": datetime(2026, 6, 20, 23, 0, tzinfo=timezone.utc)},
+    36: {"teams": ["Tunisia", "Japan"], "allow_tie": True, "kickoff": datetime(2026, 6, 21, 2, 0, tzinfo=timezone.utc)},
+    37: {"teams": ["Uruguay", "Cabo Verde"], "allow_tie": True, "kickoff": datetime(2026, 6, 21, 16, 0, tzinfo=timezone.utc)},
+    38: {"teams": ["Spain", "Saudi Arabia"], "allow_tie": True, "kickoff": datetime(2026, 6, 21, 19, 0, tzinfo=timezone.utc)},
+    39: {"teams": ["Belgium", "Iran"], "allow_tie": True, "kickoff": datetime(2026, 6, 21, 22, 0, tzinfo=timezone.utc)},
+    40: {"teams": ["New Zealand", "Egypt"], "allow_tie": True, "kickoff": datetime(2026, 6, 22, 1, 0, tzinfo=timezone.utc)},
+    41: {"teams": ["Norway", "Senegal"], "allow_tie": True, "kickoff": datetime(2026, 6, 22, 19, 0, tzinfo=timezone.utc)},
+    42: {"teams": ["France", "Iraq"], "allow_tie": True, "kickoff": datetime(2026, 6, 22, 22, 0, tzinfo=timezone.utc)},
+    43: {"teams": ["Argentina", "Austria"], "allow_tie": True, "kickoff": datetime(2026, 6, 23, 1, 0, tzinfo=timezone.utc)},
+    44: {"teams": ["Jordan", "Algeria"], "allow_tie": True, "kickoff": datetime(2026, 6, 23, 4, 0, tzinfo=timezone.utc)},
+    45: {"teams": ["England", "Ghana"], "allow_tie": True, "kickoff": datetime(2026, 6, 23, 17, 0, tzinfo=timezone.utc)},
+    46: {"teams": ["Panama", "Croatia"], "allow_tie": True, "kickoff": datetime(2026, 6, 23, 20, 0, tzinfo=timezone.utc)},
+    47: {"teams": ["Portugal", "Uzbekistan"], "allow_tie": True, "kickoff": datetime(2026, 6, 23, 23, 0, tzinfo=timezone.utc)},
+    48: {"teams": ["Colombia", "Congo DR"], "allow_tie": True, "kickoff": datetime(2026, 6, 24, 2, 0, tzinfo=timezone.utc)},
+
+    # --- GROUP STAGE: ROUND 3 ---
+    49: {"teams": ["Scotland", "Brazil"], "allow_tie": True, "kickoff": datetime(2026, 6, 24, 16, 0, tzinfo=timezone.utc)},
+    50: {"teams": ["Morocco", "Haiti"], "allow_tie": True, "kickoff": datetime(2026, 6, 24, 16, 0, tzinfo=timezone.utc)},
+    51: {"teams": ["Switzerland", "Canada"], "allow_tie": True, "kickoff": datetime(2026, 6, 24, 20, 0, tzinfo=timezone.utc)},
+    52: {"teams": ["Bosnia and Herzegovina", "Qatar"], "allow_tie": True, "kickoff": datetime(2026, 6, 24, 20, 0, tzinfo=timezone.utc)},
+    53: {"teams": ["Czechia", "Mexico"], "allow_tie": True, "kickoff": datetime(2026, 6, 24, 23, 0, tzinfo=timezone.utc)},
+    54: {"teams": ["South Africa", "South Korea"], "allow_tie": True, "kickoff": datetime(2026, 6, 24, 23, 0, tzinfo=timezone.utc)},
+    55: {"teams": ["Curaçao", "Ivory Coast"], "allow_tie": True, "kickoff": datetime(2026, 6, 25, 16, 0, tzinfo=timezone.utc)},
+    56: {"teams": ["Ecuador", "Germany"], "allow_tie": True, "kickoff": datetime(2026, 6, 25, 16, 0, tzinfo=timezone.utc)},
+    57: {"teams": ["Japan", "Sweden"], "allow_tie": True, "kickoff": datetime(2026, 6, 25, 20, 0, tzinfo=timezone.utc)},
+    58: {"teams": ["Tunisia", "Netherlands"], "allow_tie": True, "kickoff": datetime(2026, 6, 25, 20, 0, tzinfo=timezone.utc)},
+    59: {"teams": ["Türkiye", "USA"], "allow_tie": True, "kickoff": datetime(2026, 6, 25, 23, 0, tzinfo=timezone.utc)},
+    60: {"teams": ["Paraguay", "Australia"], "allow_tie": True, "kickoff": datetime(2026, 6, 25, 23, 0, tzinfo=timezone.utc)},
+    61: {"teams": ["New Zealand", "Belgium"], "allow_tie": True, "kickoff": datetime(2026, 6, 26, 16, 0, tzinfo=timezone.utc)},
+    62: {"teams": ["Egypt", "Iran"], "allow_tie": True, "kickoff": datetime(2026, 6, 26, 16, 0, tzinfo=timezone.utc)},
+    63: {"teams": ["Cabo Verde", "Spain"], "allow_tie": True, "kickoff": datetime(2026, 6, 26, 20, 0, tzinfo=timezone.utc)},
+    64: {"teams": ["Saudi Arabia", "Uruguay"], "allow_tie": True, "kickoff": datetime(2026, 6, 26, 20, 0, tzinfo=timezone.utc)},
+    65: {"teams": ["Iraq", "Senegal"], "allow_tie": True, "kickoff": datetime(2026, 6, 26, 23, 0, tzinfo=timezone.utc)},
+    66: {"teams": ["France", "Norway"], "allow_tie": True, "kickoff": datetime(2026, 6, 26, 23, 0, tzinfo=timezone.utc)},
+    67: {"teams": ["Jordan", "Argentina"], "allow_tie": True, "kickoff": datetime(2026, 6, 27, 16, 0, tzinfo=timezone.utc)},
+    68: {"teams": ["Algeria", "Austria"], "allow_tie": True, "kickoff": datetime(2026, 6, 27, 16, 0, tzinfo=timezone.utc)},
+    69: {"teams": ["Croatia", "Ghana"], "allow_tie": True, "kickoff": datetime(2026, 6, 27, 20, 0, tzinfo=timezone.utc)},
+    70: {"teams": ["Panama", "England"], "allow_tie": True, "kickoff": datetime(2026, 6, 27, 20, 0, tzinfo=timezone.utc)},
+    71: {"teams": ["Congo DR", "Uzbekistan"], "allow_tie": True, "kickoff": datetime(2026, 6, 27, 23, 0, tzinfo=timezone.utc)},
+    72: {"teams": ["Colombia", "Portugal"], "allow_tie": True, "kickoff": datetime(2026, 6, 27, 23, 0, tzinfo=timezone.utc)},
 }
 
-# Procedural placeholders to maintain framework structural safety bounds
-for i in range(16, 73):
-    if i not in MATCHES:
-        MATCHES[i] = {"teams": [f"Group Team A_{i}", f"Group Team B_{i}"], "allow_tie": True, "kickoff": datetime(2026, 6, 26, 18, 0, tzinfo=timezone.utc)}
-for k in range(73, 89):
-    MATCHES[k] = {"teams": [f"Group Winner / Runner-up TBD", f"Group Qualifier TBD"], "allow_tie": False, "kickoff": datetime(2026, 6, 29, 20, 0, tzinfo=timezone.utc)}
-for k in range(89, 97):
-    MATCHES[k] = {"teams": [f"Winner Match R32_{k-16}", f"Winner Match R32_{k-15}"], "allow_tie": False, "kickoff": datetime(2026, 7, 4, 20, 0, tzinfo=timezone.utc)}
-for k in range(97, 101):
-    MATCHES[k] = {"teams": [f"Quarter Finalist Team A", f"Quarter Finalist Team B"], "allow_tie": False, "kickoff": datetime(2026, 7, 9, 20, 0, tzinfo=timezone.utc)}
-for k in range(101, 103):
-    MATCHES[k] = {"teams": [f"Semi Finalist Team A", f"Semi Finalist Team B"], "allow_tie": False, "kickoff": datetime(2026, 7, 14, 20, 0, tzinfo=timezone.utc)}
-MATCHES[103] = {"teams": ["Bronze Finalist Loser 101", "Bronze Finalist Loser 102"], "allow_tie": False, "kickoff": datetime(2026, 7, 18, 20, 0, tzinfo=timezone.utc)}
-MATCHES[104] = {"teams": ["World Cup Finalist A", "World Cup Finalist B"], "allow_tie": False, "kickoff": datetime(2026, 7, 19, 19, 0, tzinfo=timezone.utc)}
+# --- 🏆 KNOCKOUT COUPLING BLOCKS ---
+r32_slots = [
+    (73, "Group A Runner-up", "Group B Runner-up", datetime(2026, 6, 28, 21, 0, tzinfo=timezone.utc)),
+    (74, "Group E Winner", "Group A/B/C/D/F Third Place", datetime(2026, 6, 29, 18, 0, tzinfo=timezone.utc)),
+    (75, "Group F Winner", "Group C Runner-up", datetime(2026, 6, 29, 21, 0, tzinfo=timezone.utc)),
+    (76, "Group C Winner", "Group F Runner-up", datetime(2026, 6, 29, 23, 0, tzinfo=timezone.utc)),
+    (77, "Group I Winner", "Group C/D/F/G/H Third Place", datetime(2026, 6, 30, 16, 0, tzinfo=timezone.utc)),
+    (78, "Group E Runner-up", "Group I Runner-up", datetime(2026, 6, 30, 19, 0, tzinfo=timezone.utc)),
+    (79, "Group A Winner", "Group C/E/F/H/I Third Place", datetime(2026, 6, 30, 22, 0, tzinfo=timezone.utc)),
+    (80, "Group L Winner", "Group E/H/I/J/K Third Place", datetime(2026, 7, 1, 16, 0, tzinfo=timezone.utc)),
+    (81, "Group D Winner", "Group B/E/F/I/J Third Place", datetime(2026, 7, 1, 19, 0, tzinfo=timezone.utc)),
+    (82, "Group G Winner", "Group A/E/H/I/J Third Place", datetime(2026, 7, 1, 22, 0, tzinfo=timezone.utc)),
+    (83, "Group K Runner-up", "Group L Runner-up", datetime(2026, 7, 2, 16, 0, tzinfo=timezone.utc)),
+    (84, "Group H Winner", "Group J Runner-up", datetime(2026, 7, 2, 19, 0, tzinfo=timezone.utc)),
+    (85, "Group B Winner", "Group E/F/G/I/J Third Place", datetime(2026, 7, 2, 22, 0, tzinfo=timezone.utc)),
+    (86, "Group J Winner", "Group H Runner-up", datetime(2026, 7, 3, 16, 0, tzinfo=timezone.utc)),
+    (87, "Group K Winner", "Group D/E/I/J/L Third Place", datetime(2026, 7, 3, 19, 0, tzinfo=timezone.utc)),
+    (88, "Group D Runner-up", "Group G Runner-up", datetime(2026, 7, 3, 22, 0, tzinfo=timezone.utc))
+]
+for m_id, t1, t2, dt in r32_slots:
+    MATCHES[m_id] = {"teams": [t1, t2], "allow_tie": False, "kickoff": dt}
+
+r16_slots = [
+    (89, 74, 77, datetime(2026, 7, 4, 18, 0, tzinfo=timezone.utc)),
+    (90, 73, 75, datetime(2026, 7, 4, 21, 0, tzinfo=timezone.utc)),
+    (91, 76, 78, datetime(2026, 7, 5, 18, 0, tzinfo=timezone.utc)),
+    (92, 79, 80, datetime(2026, 7, 5, 21, 0, tzinfo=timezone.utc)),
+    (93, 83, 84, datetime(2026, 7, 6, 18, 0, tzinfo=timezone.utc)),
+    (94, 81, 82, datetime(2026, 7, 6, 21, 0, tzinfo=timezone.utc)),
+    (95, 86, 88, datetime(2026, 7, 7, 18, 0, tzinfo=timezone.utc)),
+    (96, 85, 87, datetime(2026, 7, 7, 21, 0, tzinfo=timezone.utc))
+]
+for m_id, src1, src2, dt in r16_slots:
+    MATCHES[m_id] = {"teams": [f"Winner Match {src1}", f"Winner Match {src2}"], "allow_tie": False, "kickoff": dt}
+
+qf_slots = [
+    (97, 89, 90, datetime(2026, 7, 9, 21, 0, tzinfo=timezone.utc)),
+    (98, 93, 94, datetime(2026, 7, 10, 21, 0, tzinfo=timezone.utc)),
+    (99, 91, 92, datetime(2026, 7, 11, 18, 0, tzinfo=timezone.utc)),
+    (100, 95, 96, datetime(2026, 7, 11, 21, 0, tzinfo=timezone.utc))
+]
+for m_id, src1, src2, dt in qf_slots:
+    MATCHES[m_id] = {"teams": [f"Winner Match {src1}", f"Winner Match {src2}"], "allow_tie": False, "kickoff": dt}
+
+MATCHES[101] = {"teams": ["Winner Match 97", "Winner Match 98"], "allow_tie": False, "kickoff": datetime(2026, 7, 14, 21, 0, tzinfo=timezone.utc)}
+MATCHES[102] = {"teams": ["Winner Match 99", "Winner Match 100"], "allow_tie": False, "kickoff": datetime(2026, 7, 15, 21, 0, tzinfo=timezone.utc)}
+MATCHES[103] = {"teams": ["Loser Match 101", "Loser Match 102"], "allow_tie": False, "kickoff": datetime(2026, 7, 18, 21, 0, tzinfo=timezone.utc)}
+MATCHES[104] = {"teams": ["Winner Match 101", "Winner Match 102"], "allow_tie": False, "kickoff": datetime(2026, 7, 19, 19, 0, tzinfo=timezone.utc)}
 
 # --- 📊 WORLD CUP REAL-TIME RESULTS INDEX ---
 LIVE_RESULTS = {
-    1: "Mexico",
-    2: "South Korea",
-    3: "Tie",
-    4: "USA",
-    5: "Tie",
-    6: "Australia",
-    7: "Scotland",
-    8: "Tie",
-    9: "Germany",
-    10: "Ivory Coast",
-    11: "Tie",
-    12: "Sweden",
-    13: "Tie"
+    1: "Mexico", 2: "South Korea", 3: "Tie", 4: "USA", 5: "Tie",
+    6: "Australia", 7: "Scotland", 8: "Tie", 9: "Germany",
+    10: "Ivory Coast", 11: "Tie", 12: "Sweden", 13: "Tie"
 }
 
-# --- 🎛️ ROBUST DROPDOWN ENGINE ---
+# --- 🎛️ DROPDOWN ENGINE ---
 class MatchDropdown(discord.ui.Select):
     def __init__(self, match_number):
         match_info = MATCHES.get(match_number)
@@ -93,7 +181,8 @@ class MatchDropdown(discord.ui.Select):
         self.is_unfinalized = (
             "Winner" in str(teams[0]) or "Match" in str(teams[0]) or "TBD" in str(teams[0]) or
             "Winner" in str(teams[1]) or "Match" in str(teams[1]) or "TBD" in str(teams[1]) or
-            "Group Team" in str(teams[0]) or "Group Team" in str(teams[1]) or "Qualifier" in str(teams[0])
+            "Group Team" in str(teams[0]) or "Group Team" in str(teams[1]) or "Qualifier" in str(teams[0]) or
+            "Runner-up" in str(teams[0]) or "Runner-up" in str(teams[1]) or "Third Place" in str(teams[0]) or "Third Place" in str(teams[1])
         )
 
         if self.is_unfinalized:
@@ -120,7 +209,6 @@ class MatchDropdown(discord.ui.Select):
         )
 
     async def callback(self, interaction: discord.Interaction):
-        # Force a deferral to establish a working context line back to Discord instantly
         await interaction.response.defer(ephemeral=True)
         
         user_id = interaction.user.id
@@ -141,10 +229,8 @@ class MatchDropdown(discord.ui.Select):
                 return
 
         try:
-            # Re-verify and maintain database connection live inside the interaction block
             local_conn = sqlite3.connect(DB_PATH)
             local_cursor = local_conn.cursor()
-            
             local_cursor.execute(
                 "INSERT OR IGNORE INTO brackets (user_id, server_id, username) VALUES (?, ?, ?)", 
                 (user_id, server_id, username)
@@ -183,24 +269,28 @@ async def on_ready():
 @bot.tree.command(name="predict", description="Submit your World Cup predictions in groups of 5 matches.")
 @app_commands.describe(section="The section number you want to guess (1 through 21)")
 async def predict_slash(interaction: discord.Interaction, section: int = 1):
+    await interaction.response.defer(ephemeral=False)
+    
     games_per_section = 5
     start_game = ((section - 1) * games_per_section) + 1
     end_game = start_game + games_per_section - 1
     
     if start_game > 104 or section < 1:
-        await interaction.response.send_message("❌ Valid sections are 1 through 21!", ephemeral=True)
+        await interaction.followup.send("❌ Valid sections are 1 through 21!", ephemeral=True)
         return
     if end_game > 104:
         end_game = 104
         
     view = BracketSubmissionView(start_game, end_game)
-    await interaction.response.send_message(
+    await interaction.followup.send(
         content=f"🏆 **World Cup Predictions: Matches {start_game} to {end_game}**\nMake your choices below! Use `/predict section: {section + 1}` for the next set.", 
         view=view
     )
 
 @bot.tree.command(name="leaderboard", description="Check the top 20 players in this server.")
 async def leaderboard_slash(interaction: discord.Interaction):
+    await interaction.response.defer(ephemeral=False)
+    
     local_conn = sqlite3.connect(DB_PATH)
     local_cursor = local_conn.cursor()
     local_cursor.execute("SELECT username, score FROM brackets WHERE server_id = ? ORDER BY score DESC LIMIT 20", (interaction.guild.id,))
@@ -208,18 +298,20 @@ async def leaderboard_slash(interaction: discord.Interaction):
     local_conn.close()
 
     if not rows:
-        await interaction.response.send_message("📊 No prediction records currently exist for this server.", ephemeral=True)
+        await interaction.followup.send("📊 No prediction records currently exist for this server.")
         return
 
     embed = discord.Embed(title=f"🏆 {interaction.guild.name} Standings", color=0x2b6cb0)
     for index, row in enumerate(rows, start=1):
         embed.add_field(name=f"{index}. {row[0]}", value=f"🎯 Points: {row[1]}", inline=False)
     
-    await interaction.response.send_message(embed=embed)
+    await interaction.followup.send(embed=embed)
 
 @bot.tree.command(name="mypicks", description="View your saved match predictions.")
 @app_commands.describe(section="The section number to view (1-21)")
 async def mypicks_slash(interaction: discord.Interaction, section: int = 1):
+    await interaction.response.defer(ephemeral=True)
+    
     user_id = interaction.user.id
     server_id = interaction.guild.id
     
@@ -228,7 +320,7 @@ async def mypicks_slash(interaction: discord.Interaction, section: int = 1):
     end_game = start_game + games_per_section - 1
     
     if start_game > 104 or section < 1:
-        await interaction.response.send_message("❌ Valid sections are 1 through 21!", ephemeral=True)
+        await interaction.followup.send("❌ Valid sections are 1 through 21!", ephemeral=True)
         return
         
     columns_to_select = ", ".join([f"m_{i}" for i in range(start_game, min(end_game + 1, 105))])
@@ -239,9 +331,8 @@ async def mypicks_slash(interaction: discord.Interaction, section: int = 1):
     row = local_cursor.fetchone()
     local_conn.close()
     
-    # If the user has a row entry, ensure it contains at least one non-None selection
     if not row or all(pick is None for pick in row):
-        await interaction.response.send_message("📝 You haven't made predictions for this section yet.", ephemeral=True)
+        await interaction.followup.send("📝 You haven't made predictions for this section yet.", ephemeral=True)
         return
         
     embed = discord.Embed(title=f"📋 Predictions Check: Matches {start_game} to {min(end_game, 104)}", color=0x38a169)
@@ -253,7 +344,7 @@ async def mypicks_slash(interaction: discord.Interaction, section: int = 1):
             saved_pick = pick if pick else "Unsaved ❌"
             embed.add_field(name=f"Match {match_num}: {teams[0]} vs {teams[1]}", value=f"🔮 Pick: **{saved_pick}**", inline=False)
             
-    await interaction.response.send_message(embed=embed, ephemeral=True)
+    await interaction.followup.send(embed=embed, ephemeral=True)
 
 @bot.tree.command(name="match", description="Look up teams and official live results for a specific match.")
 @app_commands.describe(match_num="The match number you want to look up (1-104)")
@@ -298,7 +389,6 @@ async def update_scores_slash(interaction: discord.Interaction):
     
     local_conn = sqlite3.connect(DB_PATH)
     local_cursor = local_conn.cursor()
-    
     local_cursor.execute("SELECT user_id, username FROM brackets WHERE server_id = ?", (server_id,))
     users = local_cursor.fetchall()
     

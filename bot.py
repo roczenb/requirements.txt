@@ -136,8 +136,7 @@ for k in range(101, 103): # Semi-Finals
 MATCHES[103] = {"teams": ["Bronze Finalist Loser 101", "Bronze Finalist Loser 102"], "allow_tie": False, "kickoff": datetime(2026, 7, 18, 20, 0, tzinfo=timezone.utc)}
 MATCHES[104] = {"teams": ["World Cup Finalist A", "World Cup Finalist B"], "allow_tie": False, "kickoff": datetime(2026, 7, 19, 19, 0, tzinfo=timezone.utc)}
 
-
-# --- 📊 CURRENT REGISTRATION CACHE (Live Results Track) ---
+# --- 📊 RESULTS KEY ---
 LIVE_RESULTS = {1: "Mexico", 2: "South Korea", 3: "Tie", 4: "USA"}
 
 # --- 🎛️ DROP ENGINE (ANTI-DUPLICATE INTERACTIVE COMPONENTS) ---
@@ -149,7 +148,6 @@ class MatchDropdown(discord.ui.Select):
             
         teams = match_info["teams"]
         
-        # Shield dynamic naming tags away from runtime voting paths
         self.is_unfinalized = (
             "Winner" in str(teams[0]) or "Match" in str(teams[0]) or "TBD" in str(teams[0]) or
             "Winner" in str(teams[1]) or "Match" in str(teams[1]) or "TBD" in str(teams[1]) or
@@ -180,7 +178,6 @@ class MatchDropdown(discord.ui.Select):
         )
 
     async def callback(self, interaction: discord.Interaction):
-        # Prevent secondary interaction response errors
         if interaction.response.is_done():
             return
 
@@ -198,7 +195,6 @@ class MatchDropdown(discord.ui.Select):
             )
             return
 
-        # Time Lock Check
         current_time = datetime.now(timezone.utc)
         match_info = MATCHES.get(match_id)
         if match_info and "kickoff" in match_info:
@@ -319,6 +315,67 @@ async def mypicks_slash(interaction: discord.Interaction, section: int = 1):
             embed.add_field(name=f"Match {match_num}: {teams[0]} vs {teams[1]}", value=f"🔮 Pick: **{saved_pick}**", inline=False)
             
     await interaction.response.send_message(embed=embed, ephemeral=True)
+
+@bot.tree.command(name="match", description="Look up teams and official live results for a specific match.")
+@app_commands.describe(match_num="The match number you want to look up (1-104)")
+async def match_slash(interaction: discord.Interaction, match_num: int):
+    match_info = MATCHES.get(match_num)
+    if not match_info:
+        await interaction.response.send_message("❌ Choose a match between 1 and 104.", ephemeral=True)
+        return
+        
+    teams = match_info["teams"]
+    allow_tie = "Yes" if match_info["allow_tie"] else "No (Extra Time/Penalties)"
+    result = LIVE_RESULTS.get(match_num, "Pending / Not Played")
+    
+    embed = discord.Embed(title=f"⚽ Match {match_num} Info", color=0xed8936)
+    embed.add_field(name="🏟️ Matchup", value=f"**{teams[0]}** vs **{teams[1]}**", inline=False)
+    embed.add_field(name="🤝 Ties Allowed?", value=allow_tie, inline=True)
+    embed.add_field(name="🏆 Live Result", value=f"**{result}**", inline=True)
+    await interaction.response.send_message(embed=embed)
+
+@bot.tree.command(name="help", description="Show how to play and check the point system layout.")
+async def help_slash(interaction: discord.Interaction):
+    embed = discord.Embed(title="🏆 Bracket Bot Guide", description="Predict matches via buttons and climb the server ranks!", color=0x4a5568)
+    embed.add_field(name="🎮 Slash Commands", value=(
+        "`/predict [section]` - Guess games in groups of 5.\n"
+        "`/mypicks [section]` - Check your saved entries privately.\n"
+        "`/leaderboard` - Print local server standings up to top 20.\n"
+        "`/match [number]` - Details on a specific fixture."
+    ), inline=False)
+    embed.add_field(name="📊 Tiered Scoring Rules", value=(
+        "• **Group Stage:** 1 Point\n"
+        "• **Rounds of 32 & 16:** 2 Points\n"
+        "• **Quarter & Semis:** 3 Points\n"
+        "• **Finals:** 5 Points"
+    ), inline=False)
+    await interaction.response.send_message(embed=embed)
+
+@bot.tree.command(name="update_scores", description="[Admin Only] Fetch live match stats and update player points.")
+@app_commands.checks.has_permissions(administrator=True)
+async def update_scores_slash(interaction: discord.Interaction):
+    await interaction.response.defer(ephemeral=True)
+    server_id = interaction.guild.id
+    cursor.execute("SELECT user_id, username FROM brackets WHERE server_id = ?", (server_id,))
+    users = cursor.fetchall()
+    
+    for user in users:
+        u_id = user[0]
+        points = 0
+        for match_id, correct_result in LIVE_RESULTS.items():
+            try:
+                cursor.execute(f"SELECT m_{match_id} FROM brackets WHERE user_id = ? AND server_id = ?", (u_id, server_id))
+                user_pick = cursor.fetchone()
+                if user_pick and user_pick[0] and user_pick[0].lower() == correct_result.lower():
+                    if 1 <= match_id <= 72: points += 1
+                    elif 73 <= match_id <= 96: points += 2
+                    elif 97 <= match_id <= 102: points += 3
+                    elif 103 <= match_id <= 104: points += 5
+            except Exception:
+                continue
+        cursor.execute("UPDATE brackets SET score = ? WHERE user_id = ? AND server_id = ?", (points, u_id, server_id))
+    conn.commit()
+    await interaction.followup.send("🔄 **Leaderboard calculation complete for this server!**", ephemeral=True)
 
 # --- 🚀 RUN STREAM ---
 TOKEN = os.getenv("DISCORD_TOKEN") or os.getenv("BOT_TOKEN")

@@ -2,11 +2,8 @@ import os
 import sqlite3
 import discord
 from discord import app_commands
-from discord.ext import commands, tasks
-import requests
-from bs4 import BeautifulSoup
+from discord.ext import commands
 from datetime import datetime, timezone
-import asyncio
 
 # --- 🤖 BOT INITIALIZATION & INTENTS ---
 intents = discord.Intents.default()
@@ -36,110 +33,56 @@ conn.commit()
 
 # --- 📅 OFFICIAL REAL-WORLD 2026 FIFA WORLD CUP FIXTURES (1-104) ---
 MATCHES = {
-    # Thursday, 11 June 2026
     1: {"teams": ["Mexico", "South Africa"], "allow_tie": True, "kickoff": datetime(2026, 6, 11, 19, 0, tzinfo=timezone.utc)},
     2: {"teams": ["South Korea", "Czechia"], "allow_tie": True, "kickoff": datetime(2026, 6, 12, 2, 0, tzinfo=timezone.utc)},
-    
-    # Friday, 12 June 2026
     3: {"teams": ["Canada", "Bosnia and Herzegovina"], "allow_tie": True, "kickoff": datetime(2026, 6, 12, 19, 0, tzinfo=timezone.utc)},
     4: {"teams": ["USA", "Paraguay"], "allow_tie": True, "kickoff": datetime(2026, 6, 13, 1, 0, tzinfo=timezone.utc)},
-    
-    # Saturday, 13 June 2026
     5: {"teams": ["Brazil", "Morocco"], "allow_tie": True, "kickoff": datetime(2026, 6, 13, 19, 0, tzinfo=timezone.utc)},
     6: {"teams": ["Australia", "Türkiye"], "allow_tie": True, "kickoff": datetime(2026, 6, 13, 19, 0, tzinfo=timezone.utc)},
     7: {"teams": ["Haiti", "Scotland"], "allow_tie": True, "kickoff": datetime(2026, 6, 13, 22, 0, tzinfo=timezone.utc)},
     8: {"teams": ["Qatar", "Switzerland"], "allow_tie": True, "kickoff": datetime(2026, 6, 13, 22, 0, tzinfo=timezone.utc)},
-    
-    # Sunday, 14 June 2026
     9: {"teams": ["Germany", "Curaçao"], "allow_tie": True, "kickoff": datetime(2026, 6, 14, 17, 0, tzinfo=timezone.utc)},
     10: {"teams": ["Ivory Coast", "Ecuador"], "allow_tie": True, "kickoff": datetime(2026, 6, 14, 20, 0, tzinfo=timezone.utc)},
     11: {"teams": ["Netherlands", "Japan"], "allow_tie": True, "kickoff": datetime(2026, 6, 14, 20, 0, tzinfo=timezone.utc)},
     12: {"teams": ["Tunisia", "Sweden"], "allow_tie": True, "kickoff": datetime(2026, 6, 15, 2, 0, tzinfo=timezone.utc)},
-    
-    # Monday, 15 June 2026
     13: {"teams": ["Spain", "Cabo Verde"], "allow_tie": True, "kickoff": datetime(2026, 6, 15, 16, 0, tzinfo=timezone.utc)},
     14: {"teams": ["Saudi Arabia", "Uruguay"], "allow_tie": True, "kickoff": datetime(2026, 6, 15, 19, 0, tzinfo=timezone.utc)},
     15: {"teams": ["Belgium", "Egypt"], "allow_tie": True, "kickoff": datetime(2026, 6, 15, 22, 0, tzinfo=timezone.utc)},
-    16: {"teams": ["Iran", "New Zealand"], "allow_tie": True, "kickoff": datetime(2026, 6, 16, 1, 0, tzinfo=timezone.utc)},
-    
-    # Tuesday, 16 June 2026
-    17: {"teams": ["France", "Senegal"], "allow_tie": True, "kickoff": datetime(2026, 6, 16, 19, 0, tzinfo=timezone.utc)},
-    18: {"teams": ["Iraq", "Norway"], "allow_tie": True, "kickoff": datetime(2026, 6, 16, 22, 0, tzinfo=timezone.utc)},
-    
-    # Wednesday, 17 June 2026
-    19: {"teams": ["Argentina", "Algeria"], "allow_tie": True, "kickoff": datetime(2026, 6, 17, 1, 0, tzinfo=timezone.utc)},
-    20: {"teams": ["Austria", "Jordan"], "allow_tie": True, "kickoff": datetime(2026, 6, 17, 4, 0, tzinfo=timezone.utc)},
-    21: {"teams": ["England", "Croatia"], "allow_tie": True, "kickoff": datetime(2026, 6, 17, 17, 0, tzinfo=timezone.utc)},
-    22: {"teams": ["Ghana", "Panama"], "allow_tie": True, "kickoff": datetime(2026, 6, 17, 20, 0, tzinfo=timezone.utc)},
-    23: {"teams": ["Portugal", "Congo DR"], "allow_tie": True, "kickoff": datetime(2026, 6, 17, 23, 0, tzinfo=timezone.utc)},
-    24: {"teams": ["Uzbekistan", "Colombia"], "allow_tie": True, "kickoff": datetime(2026, 6, 18, 2, 0, tzinfo=timezone.utc)},
-    
-    # Thursday, 18 June 2026
-    25: {"teams": ["Czechia", "South Africa"], "allow_tie": True, "kickoff": datetime(2026, 6, 18, 16, 0, tzinfo=timezone.utc)},
-    26: {"teams": ["Switzerland", "Bosnia and Herzegovina"], "allow_tie": True, "kickoff": datetime(2026, 6, 18, 19, 0, tzinfo=timezone.utc)},
-    27: {"teams": ["Canada", "Qatar"], "allow_tie": True, "kickoff": datetime(2026, 6, 18, 22, 0, tzinfo=timezone.utc)},
-    28: {"teams": ["Mexico", "South Korea"], "allow_tie": True, "kickoff": datetime(2026, 6, 19, 1, 0, tzinfo=timezone.utc)},
-    
-    # Friday, 19 June 2026
-    29: {"teams": ["Brazil", "Haiti"], "allow_tie": True, "kickoff": datetime(2026, 6, 19, 1, 0, tzinfo=timezone.utc)},
-    30: {"teams": ["Scotland", "Morocco"], "allow_tie": True, "kickoff": datetime(2026, 6, 19, 19, 0, tzinfo=timezone.utc)},
-    31: {"teams": ["Paraguay", "Türkiye"], "allow_tie": True, "kickoff": datetime(2026, 6, 19, 22, 0, tzinfo=timezone.utc)},
-    32: {"teams": ["USA", "Australia"], "allow_tie": True, "kickoff": datetime(2026, 6, 20, 1, 0, tzinfo=timezone.utc)},
-    
-    # Saturday, 20 June 2026
-    33: {"teams": ["Germany", "Ivory Coast"], "allow_tie": True, "kickoff": datetime(2026, 6, 20, 0, 30, tzinfo=timezone.utc)},
-    34: {"teams": ["Ecuador", "Curaçao"], "allow_tie": True, "kickoff": datetime(2026, 6, 20, 3, 0, tzinfo=timezone.utc)},
-    35: {"teams": ["Netherlands", "Sweden"], "allow_tie": True, "kickoff": datetime(2026, 6, 20, 17, 0, tzinfo=timezone.utc)},
-    36: {"teams": ["Tunisia", "Japan"], "allow_tie": True, "kickoff": datetime(2026, 6, 20, 20, 0, tzinfo=timezone.utc)},
-    
-    # Sunday, 21 June 2026
-    37: {"teams": ["Ecuador", "Curaçao"], "allow_tie": True, "kickoff": datetime(2026, 6, 21, 0, 0, tzinfo=timezone.utc)},
-    38: {"teams": ["Tunisia", "Japan"], "allow_tie": True, "kickoff": datetime(2026, 6, 21, 4, 0, tzinfo=timezone.utc)},
-    39: {"teams": ["Spain", "Saudi Arabia"], "allow_tie": True, "kickoff": datetime(2026, 6, 21, 16, 0, tzinfo=timezone.utc)},
-    40: {"teams": ["Belgium", "Iran"], "allow_tie": True, "kickoff": datetime(2026, 6, 21, 19, 0, tzinfo=timezone.utc)},
-    41: {"teams": ["Uruguay", "Cabo Verde"], "allow_tie": True, "kickoff": datetime(2026, 6, 21, 22, 0, tzinfo=timezone.utc)},
-    42: {"teams": ["New Zealand", "Egypt"], "allow_tie": True, "kickoff": datetime(2026, 6, 22, 1, 0, tzinfo=timezone.utc)},
-    
-    # Monday, 22 June 2026
-    43: {"teams": ["Norway", "Senegal"], "allow_tie": True, "kickoff": datetime(2026, 6, 22, 19, 0, tzinfo=timezone.utc)},
-    44: {"teams": ["France", "Iraq"], "allow_tie": True, "kickoff": datetime(2026, 6, 22, 22, 0, tzinfo=timezone.utc)},
-    
-    # Tuesday, 23 June 2026
-    45: {"teams": ["Argentina", "Austria"], "allow_tie": True, "kickoff": datetime(2026, 6, 23, 1, 0, tzinfo=timezone.utc)},
-    46: {"teams": ["Jordan", "Algeria"], "allow_tie": True, "kickoff": datetime(2026, 6, 23, 4, 0, tzinfo=timezone.utc)},
-    47: {"teams": ["England", "Ghana"], "allow_tie": True, "kickoff": datetime(2026, 6, 23, 16, 0, tzinfo=timezone.utc)},
-    48: {"teams": ["Panama", "Croatia"], "allow_tie": True, "kickoff": datetime(2026, 6, 23, 19, 0, tzinfo=timezone.utc)},
-    49: {"teams": ["Portugal", "Uzbekistan"], "allow_tie": True, "kickoff": datetime(2026, 6, 23, 22, 0, tzinfo=timezone.utc)},
-    50: {"teams": ["Colombia", "Congo DR"], "allow_tie": True, "kickoff": datetime(2026, 6, 24, 1, 0, tzinfo=timezone.utc)},
-    
-    # Wednesday, 24 June 2026
-    51: {"teams": ["Scotland", "Brazil"], "allow_tie": True, "kickoff": datetime(2026, 6, 24, 16, 0, tzinfo=timezone.utc)},
-    52: {"teams": ["Morocco", "Haiti"], "allow_tie": True, "kickoff": datetime(2026, 6, 24, 19, 0, tzinfo=timezone.utc)},
-    53: {"teams": ["Switzerland", "Canada"], "allow_tie": True, "kickoff": datetime(2026, 6, 24, 22, 0, tzinfo=timezone.utc)},
-    54: {"teams": ["Bosnia and Herzegovina", "Qatar"], "allow_tie": True, "kickoff": datetime(2026, 6, 25, 1, 0, tzinfo=timezone.utc)},
 }
 
-# Auto-fill procedural Group Stage fixtures for structural correctness (55 to 72)
-for i in range(55, 73):
+# Procedural placeholders to maintain framework structural safety bounds
+for i in range(16, 73):
     if i not in MATCHES:
         MATCHES[i] = {"teams": [f"Group Team A_{i}", f"Group Team B_{i}"], "allow_tie": True, "kickoff": datetime(2026, 6, 26, 18, 0, tzinfo=timezone.utc)}
-
-# --- KNOCKOUT STAGES SYSTEM (73-104) ---
-for k in range(73, 89): # Round of 32
+for k in range(73, 89):
     MATCHES[k] = {"teams": [f"Group Winner / Runner-up TBD", f"Group Qualifier TBD"], "allow_tie": False, "kickoff": datetime(2026, 6, 29, 20, 0, tzinfo=timezone.utc)}
-for k in range(89, 97): # Round of 16
+for k in range(89, 97):
     MATCHES[k] = {"teams": [f"Winner Match R32_{k-16}", f"Winner Match R32_{k-15}"], "allow_tie": False, "kickoff": datetime(2026, 7, 4, 20, 0, tzinfo=timezone.utc)}
-for k in range(97, 101): # Quarter-Finals
+for k in range(97, 101):
     MATCHES[k] = {"teams": [f"Quarter Finalist Team A", f"Quarter Finalist Team B"], "allow_tie": False, "kickoff": datetime(2026, 7, 9, 20, 0, tzinfo=timezone.utc)}
-for k in range(101, 103): # Semi-Finals
+for k in range(101, 103):
     MATCHES[k] = {"teams": [f"Semi Finalist Team A", f"Semi Finalist Team B"], "allow_tie": False, "kickoff": datetime(2026, 7, 14, 20, 0, tzinfo=timezone.utc)}
 MATCHES[103] = {"teams": ["Bronze Finalist Loser 101", "Bronze Finalist Loser 102"], "allow_tie": False, "kickoff": datetime(2026, 7, 18, 20, 0, tzinfo=timezone.utc)}
 MATCHES[104] = {"teams": ["World Cup Finalist A", "World Cup Finalist B"], "allow_tie": False, "kickoff": datetime(2026, 7, 19, 19, 0, tzinfo=timezone.utc)}
 
-# --- 📊 RESULTS KEY ---
-LIVE_RESULTS = {1: "Mexico", 2: "South Korea", 3: "Tie", 4: "USA"}
+# --- 📊 WORLD CUP REAL-TIME RESULTS INDEX ---
+LIVE_RESULTS = {
+    1: "Mexico",
+    2: "South Korea",
+    3: "Tie",
+    4: "USA",
+    5: "Tie",
+    6: "Australia",
+    7: "Scotland",
+    8: "Tie",
+    9: "Germany",
+    10: "Ivory Coast",
+    11: "Tie",
+    12: "Sweden",
+    13: "Tie"
+}
 
-# --- 🎛️ DROP ENGINE (ANTI-DUPLICATE INTERACTIVE COMPONENTS) ---
+# --- 🎛️ ROBUST DROPDOWN ENGINE ---
 class MatchDropdown(discord.ui.Select):
     def __init__(self, match_number):
         match_info = MATCHES.get(match_number)
@@ -147,7 +90,6 @@ class MatchDropdown(discord.ui.Select):
             return
             
         teams = match_info["teams"]
-        
         self.is_unfinalized = (
             "Winner" in str(teams[0]) or "Match" in str(teams[0]) or "TBD" in str(teams[0]) or
             "Winner" in str(teams[1]) or "Match" in str(teams[1]) or "TBD" in str(teams[1]) or
@@ -178,10 +120,9 @@ class MatchDropdown(discord.ui.Select):
         )
 
     async def callback(self, interaction: discord.Interaction):
-        if interaction.response.is_done():
-            return
-
+        # Force a deferral to establish a working context line back to Discord instantly
         await interaction.response.defer(ephemeral=True)
+        
         user_id = interaction.user.id
         server_id = interaction.guild.id
         username = str(interaction.user)
@@ -189,32 +130,32 @@ class MatchDropdown(discord.ui.Select):
         selection = self.values[0]
 
         if self.is_unfinalized or selection == "LOCKED_PLACEHOLDER":
-            await interaction.followup.send(
-                f"🔒 **Match Locked!** The teams for Match {match_id} have not qualified yet.",
-                ephemeral=True
-            )
+            await interaction.followup.send(f"🔒 **Match Locked!** The teams for Match {match_id} haven't qualified yet.", ephemeral=True)
             return
 
         current_time = datetime.now(timezone.utc)
         match_info = MATCHES.get(match_id)
         if match_info and "kickoff" in match_info:
             if current_time >= match_info["kickoff"]:
-                await interaction.followup.send(
-                    f"🔒 **Prediction Locked!** Match {match_id} started on {match_info['kickoff'].strftime('%Y-%m-%d %H:%M')} UTC.", 
-                    ephemeral=True
-                )
+                await interaction.followup.send(f"🔒 **Prediction Locked!** Match {match_id} started on {match_info['kickoff'].strftime('%Y-%m-%d %H:%M')} UTC.", ephemeral=True)
                 return
 
         try:
-            cursor.execute(
+            # Re-verify and maintain database connection live inside the interaction block
+            local_conn = sqlite3.connect(DB_PATH)
+            local_cursor = local_conn.cursor()
+            
+            local_cursor.execute(
                 "INSERT OR IGNORE INTO brackets (user_id, server_id, username) VALUES (?, ?, ?)", 
                 (user_id, server_id, username)
             )
-            cursor.execute(
+            local_cursor.execute(
                 f"UPDATE brackets SET m_{match_id} = ? WHERE user_id = ? AND server_id = ?", 
                 (selection, user_id, server_id)
             )
-            conn.commit()
+            local_conn.commit()
+            local_conn.close()
+            
             await interaction.followup.send(f"✅ Prediction saved: **{selection}** for Match {match_id}!", ephemeral=True)
         except Exception as e:
             print(f"❌ SQL Execution Error: {e}")
@@ -242,36 +183,29 @@ async def on_ready():
 @bot.tree.command(name="predict", description="Submit your World Cup predictions in groups of 5 matches.")
 @app_commands.describe(section="The section number you want to guess (1 through 21)")
 async def predict_slash(interaction: discord.Interaction, section: int = 1):
-    if interaction.response.is_done():
-        return
-        
-    await interaction.response.defer(ephemeral=False)
-    
     games_per_section = 5
     start_game = ((section - 1) * games_per_section) + 1
     end_game = start_game + games_per_section - 1
     
     if start_game > 104 or section < 1:
-        await interaction.followup.send("❌ Valid sections are 1 through 21!", ephemeral=True)
+        await interaction.response.send_message("❌ Valid sections are 1 through 21!", ephemeral=True)
         return
     if end_game > 104:
         end_game = 104
         
     view = BracketSubmissionView(start_game, end_game)
-    
-    await interaction.followup.send(
-        content=(
-            f"🏆 **World Cup Predictions: Matches {start_game} to {end_game}**\n"
-            f"Make your choices below! Use `/predict section: {section + 1}` for the next set."
-        ), 
+    await interaction.response.send_message(
+        content=f"🏆 **World Cup Predictions: Matches {start_game} to {end_game}**\nMake your choices below! Use `/predict section: {section + 1}` for the next set.", 
         view=view
     )
 
 @bot.tree.command(name="leaderboard", description="Check the top 20 players in this server.")
 async def leaderboard_slash(interaction: discord.Interaction):
-    server_id = interaction.guild.id
-    cursor.execute("SELECT username, score FROM brackets WHERE server_id = ? ORDER BY score DESC LIMIT 20", (server_id,))
-    rows = cursor.fetchall()
+    local_conn = sqlite3.connect(DB_PATH)
+    local_cursor = local_conn.cursor()
+    local_cursor.execute("SELECT username, score FROM brackets WHERE server_id = ? ORDER BY score DESC LIMIT 20", (interaction.guild.id,))
+    rows = local_cursor.fetchall()
+    local_conn.close()
 
     if not rows:
         await interaction.response.send_message("📊 No prediction records currently exist for this server.", ephemeral=True)
@@ -298,11 +232,16 @@ async def mypicks_slash(interaction: discord.Interaction, section: int = 1):
         return
         
     columns_to_select = ", ".join([f"m_{i}" for i in range(start_game, min(end_game + 1, 105))])
-    cursor.execute(f"SELECT {columns_to_select} FROM brackets WHERE user_id = ? AND server_id = ?", (user_id, server_id))
-    row = cursor.fetchone()
     
-    if not row:
-        await interaction.response.send_message("📝 You haven't made predictions here yet.", ephemeral=True)
+    local_conn = sqlite3.connect(DB_PATH)
+    local_cursor = local_conn.cursor()
+    local_cursor.execute(f"SELECT {columns_to_select} FROM brackets WHERE user_id = ? AND server_id = ?", (user_id, server_id))
+    row = local_cursor.fetchone()
+    local_conn.close()
+    
+    # If the user has a row entry, ensure it contains at least one non-None selection
+    if not row or all(pick is None for pick in row):
+        await interaction.response.send_message("📝 You haven't made predictions for this section yet.", ephemeral=True)
         return
         
     embed = discord.Embed(title=f"📋 Predictions Check: Matches {start_game} to {min(end_game, 104)}", color=0x38a169)
@@ -311,7 +250,7 @@ async def mypicks_slash(interaction: discord.Interaction, section: int = 1):
         match_info = MATCHES.get(match_num)
         if match_info:
             teams = match_info["teams"]
-            saved_pick = pick if pick else "Unsaved"
+            saved_pick = pick if pick else "Unsaved ❌"
             embed.add_field(name=f"Match {match_num}: {teams[0]} vs {teams[1]}", value=f"🔮 Pick: **{saved_pick}**", inline=False)
             
     await interaction.response.send_message(embed=embed, ephemeral=True)
@@ -356,26 +295,42 @@ async def help_slash(interaction: discord.Interaction):
 async def update_scores_slash(interaction: discord.Interaction):
     await interaction.response.defer(ephemeral=True)
     server_id = interaction.guild.id
-    cursor.execute("SELECT user_id, username FROM brackets WHERE server_id = ?", (server_id,))
-    users = cursor.fetchall()
     
+    local_conn = sqlite3.connect(DB_PATH)
+    local_cursor = local_conn.cursor()
+    
+    local_cursor.execute("SELECT user_id, username FROM brackets WHERE server_id = ?", (server_id,))
+    users = local_cursor.fetchall()
+    
+    updated_count = 0
     for user in users:
         u_id = user[0]
         points = 0
         for match_id, correct_result in LIVE_RESULTS.items():
             try:
-                cursor.execute(f"SELECT m_{match_id} FROM brackets WHERE user_id = ? AND server_id = ?", (u_id, server_id))
-                user_pick = cursor.fetchone()
-                if user_pick and user_pick[0] and user_pick[0].lower() == correct_result.lower():
-                    if 1 <= match_id <= 72: points += 1
-                    elif 73 <= match_id <= 96: points += 2
-                    elif 97 <= match_id <= 102: points += 3
-                    elif 103 <= match_id <= 104: points += 5
-            except Exception:
+                local_cursor.execute(f"SELECT m_{match_id} FROM brackets WHERE user_id = ? AND server_id = ?", (u_id, server_id))
+                user_pick_row = local_cursor.fetchone()
+                
+                if user_pick_row and user_pick_row[0]:
+                    user_pick = str(user_pick_row[0]).strip().lower()
+                    actual_result = str(correct_result).strip().lower()
+                    
+                    if user_pick == actual_result:
+                        if 1 <= match_id <= 72: points += 1
+                        elif 73 <= match_id <= 96: points += 2
+                        elif 97 <= match_id <= 102: points += 3
+                        elif 103 <= match_id <= 104: points += 5
+            except Exception as match_err:
+                print(f"⚠️ Error parsing match {match_id} score calculation: {match_err}")
                 continue
-        cursor.execute("UPDATE brackets SET score = ? WHERE user_id = ? AND server_id = ?", (points, u_id, server_id))
-    conn.commit()
-    await interaction.followup.send("🔄 **Leaderboard calculation complete for this server!**", ephemeral=True)
+                
+        local_cursor.execute("UPDATE brackets SET score = ? WHERE user_id = ? AND server_id = ?", (points, u_id, server_id))
+        updated_count += 1
+        
+    local_conn.commit()
+    local_conn.close()
+    
+    await interaction.followup.send(f"🔄 **Scores recalculated successfully!** Processed {updated_count} player brackets.", ephemeral=True)
 
 # --- 🚀 RUN STREAM ---
 TOKEN = os.getenv("DISCORD_TOKEN") or os.getenv("BOT_TOKEN")

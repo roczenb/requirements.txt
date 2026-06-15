@@ -34,11 +34,11 @@ cursor.execute(f"""
 """)
 conn.commit()
 
-# --- 📅 OFFICIAL 104-MATCH DATASET WITH TIME-LOCK TIMESTAMPS ---
+# --- 📅 CORRECTED CHRONOLOGICAL MATCH DATASET WITH TIME-LOCKS ---
 MATCHES = {
     # --- GROUP STAGE ---
     1: {"teams": ["Mexico", "South Africa"], "allow_tie": True, "kickoff": datetime(2026, 6, 11, 20, 0, tzinfo=timezone.utc)},
-    2: {"teams": ["South Korea", "Czechia"], "allow_tie": True, "kickoff": datetime(2026, 6, 12, 15, 0, tzinfo=timezone.utc)},
+    2: {"teams": ["South Korea", "Czechia"], "allow_tie": True, "kickoff": datetime(2026, 6, 11, 23, 0, tzinfo=timezone.utc)},
     3: {"teams": ["Canada", "Bosnia and Herzegovina"], "allow_tie": True, "kickoff": datetime(2026, 6, 12, 18, 0, tzinfo=timezone.utc)},
     4: {"teams": ["USA", "Paraguay"], "allow_tie": True, "kickoff": datetime(2026, 6, 12, 21, 0, tzinfo=timezone.utc)},
     5: {"teams": ["Haiti", "Scotland"], "allow_tie": True, "kickoff": datetime(2026, 6, 13, 13, 0, tzinfo=timezone.utc)},
@@ -153,7 +153,7 @@ MATCHES = {
     104: {"teams": ["Winner Match 101", "Winner Match 102"], "allow_tie": False, "kickoff": datetime(2026, 7, 19, 19, 0, tzinfo=timezone.utc)}
 }
 
-# --- 📊 MASTER RESULTS ANSWER KEY ---
+# --- 📊 MASTER RESULTS ANSWER KEY (NON-BLOCKING SCRAPER) ---
 MANUAL_RESULTS = {1: "Mexico", 2: "South Korea", 3: "Tie", 4: "USA", 5: "Tie"}
 LIVE_RESULTS = {}
 LIVE_RESULTS.update(MANUAL_RESULTS)
@@ -185,21 +185,21 @@ def fetch_live_world_cup_results():
                     else:
                         automated_results[idx] = "Tie"
     except Exception as e:
-        print(f"Scraper delay notice: {e}")
+        print(f"Scraper thread handling delay notice: {e}")
     return automated_results
 
-# Define a loop that runs every 60 minutes
+# Define background worker task loop
 @tasks.loop(minutes=60)
 async def auto_update_matches():
     print("🔄 Checking for tournament updates...")
     
-    # Offload the blocking web scraper request to a separate worker thread
+    # Non-blocking executor pattern offloads requests away from the event loop thread
     loop = asyncio.get_event_loop()
     scraped_data = await loop.run_in_executor(None, fetch_live_world_cup_results)
     if scraped_data:
         LIVE_RESULTS.update(scraped_data)
-        print(f"✅ Live match results dictionary re-synchronized! ({len(LIVE_RESULTS)} matches cached)")
-    
+        print(f"✅ Cached results dictionary updated synchronized. Total matches registered: {len(LIVE_RESULTS)}")
+        
     fetched_matches = [
         {"id": 1, "home": "Sentinels", "away": "Fnatic"},
         {"id": 2, "home": "Winner of Match 1", "away": "TBD"}
@@ -209,21 +209,17 @@ async def auto_update_matches():
         try:
             temp_conn = sqlite3.connect("tournament.db")
             temp_cursor = temp_conn.cursor()
-            
             for match in fetched_matches:
                 temp_cursor.execute("""
-                    UPDATE matches 
-                    SET home_team = ?, away_team = ? 
-                    WHERE id = ?
+                    UPDATE matches SET home_team = ?, away_team = ? WHERE id = ?
                 """, (match["home"], match["away"], match["id"]))
-                
             temp_conn.commit()
             temp_conn.close()
-            print("✅ Database updated with latest bracket names!")
+            print("✅ Database synced with updated knockout rosters!")
         except Exception as e:
-            print(f"Tournament DB Update Notice: {e}")
+            print(f"Tournament DB Fallback Notice: {e}")
 
-# --- 🎛️ INTERACTIVE INTERFACE COMPONENTS ---
+# --- 🎛️ ANTI-DUPLICATE INTERACTIVE COMPONENTS ---
 class MatchDropdown(discord.ui.Select):
     def __init__(self, match_number):
         match_info = MATCHES.get(match_number)
@@ -263,6 +259,10 @@ class MatchDropdown(discord.ui.Select):
         )
 
     async def callback(self, interaction: discord.Interaction):
+        # 🛡️ ANTI-DUPLICATE DROP SUBMISSION SHIELD
+        if interaction.response.is_done():
+            return
+
         await interaction.response.defer(ephemeral=True)
         user_id = interaction.user.id
         server_id = interaction.guild.id
@@ -270,7 +270,6 @@ class MatchDropdown(discord.ui.Select):
         match_id = int(self.custom_id.split("_")[-1])
         selection = self.values[0]
 
-        # 🛡️ INTERCEPT INCOMPLETE TEAM SUBMISSIONS
         if self.is_unfinalized or selection == "LOCKED_PLACEHOLDER":
             await interaction.followup.send(
                 f"🔒 **Match Locked!** You cannot submit a prediction for Match {match_id} yet because the real qualifying teams haven't been finalized in the bracket.",
@@ -278,13 +277,13 @@ class MatchDropdown(discord.ui.Select):
             )
             return
 
-        # --- 🕒 TIME LOCK CHECK ---
+        # --- 🕒 UTC COMPLIANT TIME LOCK CHECK ---
         current_time = datetime.now(timezone.utc)
         match_info = MATCHES.get(match_id)
         if match_info and "kickoff" in match_info:
             if current_time >= match_info["kickoff"]:
                 await interaction.followup.send(
-                    f"🔒 **Prediction Locked!** Match {match_id} has already kicked off. You cannot modify your selection now.", 
+                    f"🔒 **Prediction Locked!** Match {match_id} has already kicked off on {match_info['kickoff'].strftime('%Y-%m-%d %H:%M')} UTC.", 
                     ephemeral=True
                 )
                 return
@@ -311,12 +310,11 @@ class BracketSubmissionView(discord.ui.View):
             if match_num in MATCHES:
                 self.add_item(MatchDropdown(match_num))
 
-# --- 🔄 ON READY EVENT ---
+# --- 🔄 SYNC SLASH COMMANDS ON STARTUP ---
 @bot.event
 async def on_ready():
     print(f"🥇 Bot logged in as {bot.user}")
     
-    # Safely start background tasks
     if not auto_update_matches.is_running():
         auto_update_matches.start()
         
@@ -331,7 +329,10 @@ async def on_ready():
 @bot.tree.command(name="predict", description="Submit your World Cup predictions in groups of 5 matches.")
 @app_commands.describe(section="The section number you want to guess (1 through 21)")
 async def predict_slash(interaction: discord.Interaction, section: int = 1):
-    # ⏱️ IMMEDIATE DEFERRAL: This stops the 3-second timer.
+    # 🛡️ ANTI-DUPLICATE INTERACTION EXECUTION FILTER
+    if interaction.response.is_done():
+        return
+        
     await interaction.response.defer(ephemeral=False)
     
     games_per_section = 5
@@ -464,7 +465,7 @@ async def update_scores_slash(interaction: discord.Interaction):
     conn.commit()
     await interaction.followup.send("🔄 **Leaderboard calculation complete for this server!**", ephemeral=True)
 
-# --- 🚀 SAFE BOT INITIATION ---
+# --- 🚀 BOT INITIATION ---
 TOKEN = os.getenv("DISCORD_TOKEN") or os.getenv("TOKEN") or os.getenv("BOT_TOKEN")
 
 if __name__ == "__main__":
@@ -473,4 +474,3 @@ if __name__ == "__main__":
         bot.run(TOKEN)
     else:
         print("❌ CRITICAL SETUP ERROR: No Discord Bot Token found!")
-        print("Please add a variable named DISCORD_TOKEN inside your Railway environment panels.")

@@ -108,13 +108,13 @@ MATCHES = {
     66: {"teams": ["France", "Norway"], "allow_tie": True, "kickoff": datetime(2026, 6, 26, 23, 0, tzinfo=timezone.utc)},
     67: {"teams": ["Jordan", "Argentina"], "allow_tie": True, "kickoff": datetime(2026, 6, 27, 16, 0, tzinfo=timezone.utc)},
     68: {"teams": ["Algeria", "Austria"], "allow_tie": True, "kickoff": datetime(2026, 6, 27, 16, 0, tzinfo=timezone.utc)},
-    69: {"teams": ["Croatia", "Ghana"], "allow_tie": True, "kickoff": datetime(2026, 6, 27, 20, 0, tzinfo=timezone.utc)},
+    69: ["Croatia", "Ghana"], "allow_tie": True, "kickoff": datetime(2026, 6, 27, 20, 0, tzinfo=timezone.utc)},
     70: {"teams": ["Panama", "England"], "allow_tie": True, "kickoff": datetime(2026, 6, 27, 20, 0, tzinfo=timezone.utc)},
     71: {"teams": ["Congo DR", "Uzbekistan"], "allow_tie": True, "kickoff": datetime(2026, 6, 27, 23, 0, tzinfo=timezone.utc)},
     72: {"teams": ["Colombia", "Portugal"], "allow_tie": True, "kickoff": datetime(2026, 6, 27, 23, 0, tzinfo=timezone.utc)},
 }
 
-# --- 🏆 KNOCKOUT COUPLING BLOCKS ---
+# --- 🏆 KNOCKOUT SEEDINGS BLOCK ---
 r32_slots = [
     (73, "Group A Runner-up", "Group B Runner-up", datetime(2026, 6, 28, 21, 0, tzinfo=timezone.utc)),
     (74, "Group E Winner", "Group A/B/C/D/F Third Place", datetime(2026, 6, 29, 18, 0, tzinfo=timezone.utc)),
@@ -209,8 +209,12 @@ class MatchDropdown(discord.ui.Select):
         )
 
     async def callback(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True)
-        
+        try:
+            await interaction.response.defer(ephemeral=True)
+            used_followup = True
+        except discord.errors.NotFound:
+            used_followup = False
+            
         user_id = interaction.user.id
         server_id = interaction.guild.id
         username = str(interaction.user)
@@ -218,14 +222,18 @@ class MatchDropdown(discord.ui.Select):
         selection = self.values[0]
 
         if self.is_unfinalized or selection == "LOCKED_PLACEHOLDER":
-            await interaction.followup.send(f"🔒 **Match Locked!** The teams for Match {match_id} haven't qualified yet.", ephemeral=True)
+            msg = f"🔒 **Match Locked!** The teams for Match {match_id} haven't qualified yet."
+            if used_followup: await interaction.followup.send(msg, ephemeral=True)
+            else: await interaction.channel.send(f"{interaction.user.mention} {msg}", delete_after=10)
             return
 
         current_time = datetime.now(timezone.utc)
         match_info = MATCHES.get(match_id)
         if match_info and "kickoff" in match_info:
             if current_time >= match_info["kickoff"]:
-                await interaction.followup.send(f"🔒 **Prediction Locked!** Match {match_id} started on {match_info['kickoff'].strftime('%Y-%m-%d %H:%M')} UTC.", ephemeral=True)
+                msg = f"🔒 **Prediction Locked!** Match {match_id} started on {match_info['kickoff'].strftime('%Y-%m-%d %H:%M')} UTC."
+                if used_followup: await interaction.followup.send(msg, ephemeral=True)
+                else: await interaction.channel.send(f"{interaction.user.mention} {msg}", delete_after=10)
                 return
 
         try:
@@ -242,10 +250,14 @@ class MatchDropdown(discord.ui.Select):
             local_conn.commit()
             local_conn.close()
             
-            await interaction.followup.send(f"✅ Prediction saved: **{selection}** for Match {match_id}!", ephemeral=True)
+            msg = f"✅ Prediction saved: **{selection}** for Match {match_id}!"
+            if used_followup: await interaction.followup.send(msg, ephemeral=True)
+            else: await interaction.channel.send(f"{interaction.user.mention} {msg}", delete_after=10)
         except Exception as e:
             print(f"❌ SQL Execution Error: {e}")
-            await interaction.followup.send("⚠️ Database synchronization error occurred.", ephemeral=True)
+            msg = "⚠️ Database synchronization error occurred."
+            if used_followup: await interaction.followup.send(msg, ephemeral=True)
+            else: await interaction.channel.send(f"{interaction.user.mention} {msg}", delete_after=10)
 
 class BracketSubmissionView(discord.ui.View):
     def __init__(self, start_game, end_game):
@@ -269,27 +281,39 @@ async def on_ready():
 @bot.tree.command(name="predict", description="Submit your World Cup predictions in groups of 5 matches.")
 @app_commands.describe(section="The section number you want to guess (1 through 21)")
 async def predict_slash(interaction: discord.Interaction, section: int = 1):
-    await interaction.response.defer(ephemeral=False)
-    
+    try:
+        await interaction.response.defer(ephemeral=False)
+        used_followup = True
+    except discord.errors.NotFound:
+        used_followup = False
+
     games_per_section = 5
     start_game = ((section - 1) * games_per_section) + 1
     end_game = start_game + games_per_section - 1
     
     if start_game > 104 or section < 1:
-        await interaction.followup.send("❌ Valid sections are 1 through 21!", ephemeral=True)
+        msg = "❌ Valid sections are 1 through 21!"
+        if used_followup: await interaction.followup.send(msg, ephemeral=True)
+        else: await interaction.channel.send(f"{interaction.user.mention} {msg}", delete_after=10)
         return
     if end_game > 104:
         end_game = 104
         
     view = BracketSubmissionView(start_game, end_game)
-    await interaction.followup.send(
-        content=f"🏆 **World Cup Predictions: Matches {start_game} to {end_game}**\nMake your choices below! Use `/predict section: {section + 1}` for the next set.", 
-        view=view
-    )
+    content = f"🏆 **World Cup Predictions: Matches {start_game} to {end_game}**\nMake your choices below! Use `/predict section: {section + 1}` for the next set."
+    
+    if used_followup:
+        await interaction.followup.send(content=content, view=view)
+    else:
+        await interaction.channel.send(content=f"{interaction.user.mention}\n{content}", view=view)
 
 @bot.tree.command(name="leaderboard", description="Check the top 20 players in this server.")
 async def leaderboard_slash(interaction: discord.Interaction):
-    await interaction.response.defer(ephemeral=False)
+    try:
+        await interaction.response.defer(ephemeral=False)
+        used_followup = True
+    except discord.errors.NotFound:
+        used_followup = False
     
     local_conn = sqlite3.connect(DB_PATH)
     local_cursor = local_conn.cursor()
@@ -298,19 +322,27 @@ async def leaderboard_slash(interaction: discord.Interaction):
     local_conn.close()
 
     if not rows:
-        await interaction.followup.send("📊 No prediction records currently exist for this server.")
+        msg = "📊 No prediction records currently exist for this server."
+        if used_followup: await interaction.followup.send(msg)
+        else: await interaction.channel.send(msg, delete_after=10)
         return
 
     embed = discord.Embed(title=f"🏆 {interaction.guild.name} Standings", color=0x2b6cb0)
     for index, row in enumerate(rows, start=1):
         embed.add_field(name=f"{index}. {row[0]}", value=f"🎯 Points: {row[1]}", inline=False)
     
-    await interaction.followup.send(embed=embed)
+    if used_followup: await interaction.followup.send(embed=embed)
+    else: await interaction.channel.send(embed=embed)
 
 @bot.tree.command(name="mypicks", description="View your saved match predictions.")
 @app_commands.describe(section="The section number to view (1-21)")
 async def mypicks_slash(interaction: discord.Interaction, section: int = 1):
-    await interaction.response.defer(ephemeral=True)
+    try:
+        await interaction.response.defer(ephemeral=True)
+        used_followup = True
+    except discord.errors.NotFound:
+        used_followup = False
+        print(f"⚠️ Warning: Interaction for /mypicks expired before deferral due to gateway latency.")
     
     user_id = interaction.user.id
     server_id = interaction.guild.id
@@ -320,7 +352,9 @@ async def mypicks_slash(interaction: discord.Interaction, section: int = 1):
     end_game = start_game + games_per_section - 1
     
     if start_game > 104 or section < 1:
-        await interaction.followup.send("❌ Valid sections are 1 through 21!", ephemeral=True)
+        msg = "❌ Valid sections are 1 through 21!"
+        if used_followup: await interaction.followup.send(msg, ephemeral=True)
+        else: await interaction.channel.send(f"{interaction.user.mention} {msg}", delete_after=10)
         return
         
     columns_to_select = ", ".join([f"m_{i}" for i in range(start_game, min(end_game + 1, 105))])
@@ -332,7 +366,9 @@ async def mypicks_slash(interaction: discord.Interaction, section: int = 1):
     local_conn.close()
     
     if not row or all(pick is None for pick in row):
-        await interaction.followup.send("📝 You haven't made predictions for this section yet.", ephemeral=True)
+        msg = "📝 You haven't made predictions for this section yet."
+        if used_followup: await interaction.followup.send(msg, ephemeral=True)
+        else: await interaction.channel.send(f"{interaction.user.mention} {msg}", delete_after=10)
         return
         
     embed = discord.Embed(title=f"📋 Predictions Check: Matches {start_game} to {min(end_game, 104)}", color=0x38a169)
@@ -344,7 +380,10 @@ async def mypicks_slash(interaction: discord.Interaction, section: int = 1):
             saved_pick = pick if pick else "Unsaved ❌"
             embed.add_field(name=f"Match {match_num}: {teams[0]} vs {teams[1]}", value=f"🔮 Pick: **{saved_pick}**", inline=False)
             
-    await interaction.followup.send(embed=embed, ephemeral=True)
+    if used_followup:
+        await interaction.followup.send(embed=embed, ephemeral=True)
+    else:
+        await interaction.channel.send(content=f"{interaction.user.mention} Here are your picks:", embed=embed, delete_after=30)
 
 @bot.tree.command(name="match", description="Look up teams and official live results for a specific match.")
 @app_commands.describe(match_num="The match number you want to look up (1-104)")
@@ -366,12 +405,12 @@ async def match_slash(interaction: discord.Interaction, match_num: int):
 
 @bot.tree.command(name="help", description="Show how to play and check the point system layout.")
 async def help_slash(interaction: discord.Interaction):
-    embed = discord.Embed(title="🏆 Bracket Bot Guide", description="Predict matches via buttons and climb the server ranks!", color=0x4a5568)
+    embed = discord.Embed(title="🏆 Bracket Bot Guide", description="Predict matches via dropdowns and climb server ranks!", color=0x4a5568)
     embed.add_field(name="🎮 Slash Commands", value=(
-        "`/predict [section]` - Guess games in groups of 5.\n"
-        "`/mypicks [section]` - Check your saved entries privately.\n"
-        "`/leaderboard` - Print local server standings up to top 20.\n"
-        "`/match [number]` - Details on a specific fixture."
+        "`/predict [section]` - Guess games in blocks of 5.\n"
+        "`/mypicks [section]` - Check your saved choices.\n"
+        "`/leaderboard` - Print top 20 player standings.\n"
+        "`/match [number]` - Live info regarding a fixture."
     ), inline=False)
     embed.add_field(name="📊 Tiered Scoring Rules", value=(
         "• **Group Stage:** 1 Point\n"
@@ -384,9 +423,13 @@ async def help_slash(interaction: discord.Interaction):
 @bot.tree.command(name="update_scores", description="[Admin Only] Fetch live match stats and update player points.")
 @app_commands.checks.has_permissions(administrator=True)
 async def update_scores_slash(interaction: discord.Interaction):
-    await interaction.response.defer(ephemeral=True)
+    try:
+        await interaction.response.defer(ephemeral=True)
+        used_followup = True
+    except discord.errors.NotFound:
+        used_followup = False
+        
     server_id = interaction.guild.id
-    
     local_conn = sqlite3.connect(DB_PATH)
     local_cursor = local_conn.cursor()
     local_cursor.execute("SELECT user_id, username FROM brackets WHERE server_id = ?", (server_id,))
@@ -411,7 +454,7 @@ async def update_scores_slash(interaction: discord.Interaction):
                         elif 97 <= match_id <= 102: points += 3
                         elif 103 <= match_id <= 104: points += 5
             except Exception as match_err:
-                print(f"⚠️ Error parsing match {match_id} score calculation: {match_err}")
+                print(f"⚠️ Error parsing match {match_id} calculations: {match_err}")
                 continue
                 
         local_cursor.execute("UPDATE brackets SET score = ? WHERE user_id = ? AND server_id = ?", (points, u_id, server_id))
@@ -420,13 +463,15 @@ async def update_scores_slash(interaction: discord.Interaction):
     local_conn.commit()
     local_conn.close()
     
-    await interaction.followup.send(f"🔄 **Scores recalculated successfully!** Processed {updated_count} player brackets.", ephemeral=True)
+    msg = f"🔄 **Scores recalculated successfully!** Processed {updated_count} player brackets."
+    if used_followup: await interaction.followup.send(msg, ephemeral=True)
+    else: await interaction.channel.send(msg, delete_after=15)
 
-# --- 🚀 RUN STREAM ---
+# --- 🚀 RUN BOT CONTAINER ---
 TOKEN = os.getenv("DISCORD_TOKEN") or os.getenv("BOT_TOKEN")
 
 if __name__ == "__main__":
     if TOKEN:
         bot.run(TOKEN)
     else:
-        print("❌ CRITICAL SETUP ERROR: No Discord Bot Token found!")
+        print("❌ CRITICAL SETUP ERROR: No Discord Bot Token found inside environment variables!")

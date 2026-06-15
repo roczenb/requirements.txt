@@ -209,6 +209,7 @@ class MatchDropdown(discord.ui.Select):
         )
 
     async def callback(self, interaction: discord.Interaction):
+        # SPEED OPTIMIZATION: Instantly process the interaction response loop before any logic reads
         try:
             await interaction.response.defer(ephemeral=True)
             used_followup = True
@@ -289,6 +290,7 @@ async def on_ready():
 @bot.tree.command(name="predict", description="Submit your World Cup predictions in groups of 5 matches.")
 @app_commands.describe(section="The section number you want to guess (1 through 21)")
 async def predict_slash(interaction: discord.Interaction, section: int = 1):
+    # SPEED OPTIMIZATION: Instantly acknowledge interaction event
     try:
         await interaction.response.defer(ephemeral=False)
         used_followup = True
@@ -323,6 +325,7 @@ async def predict_slash(interaction: discord.Interaction, section: int = 1):
 
 @bot.tree.command(name="leaderboard", description="Check the top 20 players in this server.")
 async def leaderboard_slash(interaction: discord.Interaction):
+    # SPEED OPTIMIZATION: Instantly acknowledge interaction event
     try:
         await interaction.response.defer(ephemeral=False)
         used_followup = True
@@ -359,6 +362,7 @@ async def leaderboard_slash(interaction: discord.Interaction):
 @bot.tree.command(name="mypicks", description="View your saved match predictions.")
 @app_commands.describe(section="The section number to view (1-21)")
 async def mypicks_slash(interaction: discord.Interaction, section: int = 1):
+    # SPEED OPTIMIZATION: Instantly acknowledge interaction event
     try:
         await interaction.response.defer(ephemeral=True)
         used_followup = True
@@ -420,9 +424,20 @@ async def mypicks_slash(interaction: discord.Interaction, section: int = 1):
 @bot.tree.command(name="match", description="Look up teams and official live results for a specific match.")
 @app_commands.describe(match_num="The match number you want to look up (1-104)")
 async def match_slash(interaction: discord.Interaction, match_num: int):
+    # SPEED OPTIMIZATION: Instantly acknowledge interaction event
+    try:
+        await interaction.response.defer(ephemeral=False)
+        used_followup = True
+    except discord.errors.NotFound:
+        used_followup = False
+
     match_info = MATCHES.get(match_num)
     if not match_info:
-        await interaction.response.send_message("❌ Choose a match between 1 and 104.", ephemeral=True)
+        msg = "❌ Choose a match between 1 and 104."
+        if used_followup: await interaction.followup.send(msg, ephemeral=True)
+        else:
+            try: await interaction.user.send(msg)
+            except discord.Forbidden: pass
         return
         
     teams = match_info["teams"]
@@ -434,9 +449,9 @@ async def match_slash(interaction: discord.Interaction, match_num: int):
     embed.add_field(name="🤝 Ties Allowed?", value=allow_tie, inline=True)
     embed.add_field(name="🏆 Live Result", value=f"**{result}**", inline=True)
     
-    try:
-        await interaction.response.send_message(embed=embed)
-    except discord.errors.NotFound:
+    if used_followup:
+        await interaction.followup.send(embed=embed)
+    else:
         try: await interaction.channel.send(embed=embed)
         except discord.Forbidden:
             try: await interaction.user.send(embed=embed)
@@ -444,6 +459,13 @@ async def match_slash(interaction: discord.Interaction, match_num: int):
 
 @bot.tree.command(name="help", description="Show how to play and check the point system layout.")
 async def help_slash(interaction: discord.Interaction):
+    # SPEED OPTIMIZATION: Instantly acknowledge interaction event
+    try:
+        await interaction.response.defer(ephemeral=False)
+        used_followup = True
+    except discord.errors.NotFound:
+        used_followup = False
+
     embed = discord.Embed(title="🏆 Bracket Bot Guide", description="Predict matches via dropdowns and climb server ranks!", color=0x4a5568)
     embed.add_field(name="🎮 Slash Commands", value=(
         "`/predict [section]` - Guess games in blocks of 5.\n"
@@ -458,9 +480,9 @@ async def help_slash(interaction: discord.Interaction):
         "• **Finals:** 5 Points"
     ), inline=False)
     
-    try:
-        await interaction.response.send_message(embed=embed)
-    except discord.errors.NotFound:
+    if used_followup:
+        await interaction.followup.send(embed=embed)
+    else:
         try: await interaction.channel.send(embed=embed)
         except discord.Forbidden:
             try: await interaction.user.send(embed=embed)
@@ -469,6 +491,7 @@ async def help_slash(interaction: discord.Interaction):
 @bot.tree.command(name="update_scores", description="[Admin Only] Fetch live match stats and update player points.")
 @app_commands.checks.has_permissions(administrator=True)
 async def update_scores_slash(interaction: discord.Interaction):
+    # SPEED OPTIMIZATION: Instantly acknowledge interaction event
     try:
         await interaction.response.defer(ephemeral=True)
         used_followup = True

@@ -50,7 +50,6 @@ async def auto_update_matches():
         {"id": 2, "home": "Winner of Match 1", "away": "TBD"}
     ]
     
-    # Note: Using your local tournament.db configuration context
     try:
         temp_conn = sqlite3.connect("tournament.db")
         temp_cursor = temp_conn.cursor()
@@ -150,7 +149,7 @@ MATCHES = {
     75: {"teams": ["Group B Winner", "Group A Runner-up"], "allow_tie": False, "kickoff": datetime(2026, 6, 29, 16, 0, tzinfo=timezone.utc)},
     76: {"teams": ["Group D Winner", "Group C Runner-up"], "allow_tie": False, "kickoff": datetime(2026, 6, 29, 20, 0, tzinfo=timezone.utc)},
     77: {"teams": ["Group E Winner", "Group F Runner-up"], "allow_tie": False, "kickoff": datetime(2026, 6, 30, 16, 0, tzinfo=timezone.utc)},
-    78: {"teams": ["Group G Winner", "Group H Runner-up"], "allow_tie": False, "kickoff": datetime(2026, 6, 30, 20, 0, tzinfo=timezone.utc)},
+    78: {"teams": ["Group G Winner", "Group H Runner-up"], "allow_tie": False, "kickoff": datetime(2026, 7, 30, 20, 0, tzinfo=timezone.utc)},
     79: {"teams": ["Group F Winner", "Group E Runner-up"], "allow_tie": False, "kickoff": datetime(2026, 7, 1, 16, 0, tzinfo=timezone.utc)},
     80: {"teams": ["Group H Winner", "Group G Runner-up"], "allow_tie": False, "kickoff": datetime(2026, 7, 1, 20, 0, tzinfo=timezone.utc)},
     81: {"teams": ["Group I Winner", "Group J Runner-up"], "allow_tie": False, "kickoff": datetime(2026, 7, 2, 16, 0, tzinfo=timezone.utc)},
@@ -240,16 +239,14 @@ class MatchDropdown(discord.ui.Select):
         )
 
         if self.is_unfinalized:
-            # If teams are placeholders, load a single locked display box so they can't save votes
             options = [
                 discord.SelectOption(
-                    label=f"🔒 Locked: Teams Unfinalized", 
+                    label="🔒 Locked: Teams Unfinalized", 
                     value="LOCKED_PLACEHOLDER", 
                     description=f"{teams[0]} vs {teams[1]}"
                 )
             ]
         else:
-            # Otherwise, build options normally
             options = [
                 discord.SelectOption(label=f"🥇 Winner: {teams[0]}", value=teams[0]),
                 discord.SelectOption(label=f"🥈 Winner: {teams[1]}", value=teams[1])
@@ -281,7 +278,7 @@ class MatchDropdown(discord.ui.Select):
             return
 
         # --- 🕒 TIME LOCK CHECK (FIXED TIMEZONE DRIFT BUG) ---
-        current_time = datetime.now(timezone.utc)  # Safely forces server time into clean UTC
+        current_time = datetime.now(timezone.utc)
         match_info = MATCHES.get(match_id)
         if match_info and "kickoff" in match_info:
             if current_time >= match_info["kickoff"]:
@@ -313,12 +310,11 @@ class BracketSubmissionView(discord.ui.View):
             if match_num in MATCHES:
                 self.add_item(MatchDropdown(match_num))
 
-# --- 🔄 SYNC SLASH COMMANDS & TRIGGER LOOP ON STARTUP ---
+# --- 🔄 SYNC SLASH COMMANDS ON STARTUP ---
 @bot.event
 async def on_ready():
     print(f"🥇 Bot logged in as {bot.user}")
     
-    # Fire up the loop the moment the bot logs into Discord
     if not auto_update_matches.is_running():
         auto_update_matches.start()
         
@@ -333,20 +329,27 @@ async def on_ready():
 @bot.tree.command(name="predict", description="Submit your World Cup predictions in groups of 5 matches.")
 @app_commands.describe(section="The section number you want to guess (1 through 21)")
 async def predict_slash(interaction: discord.Interaction, section: int = 1):
+    # ⏱️ IMMEDIATE DEFERRAL CRITICAL FIX: Stops the Discord 3-second timeout clock completely!
+    await interaction.response.defer(ephemeral=False)
+    
     games_per_section = 5
     start_game = ((section - 1) * games_per_section) + 1
     end_game = start_game + games_per_section - 1
     
     if start_game > 104 or section < 1:
-        await interaction.response.send_message("❌ Valid sections are 1 through 21!", ephemeral=True)
+        await interaction.followup.send("❌ Valid sections are 1 through 21!", ephemeral=True)
         return
     if end_game > 104:
         end_game = 104
         
     view = BracketSubmissionView(start_game, end_game)
-    await interaction.response.send_message(
-        f"🏆 **World Cup Predictions: Matches {start_game} to {end_game}**\n"
-        f"Make your choices below! Use `/predict section: {section + 1}` for the next set.", 
+    
+    # Send using interaction.followup since we deferred
+    await interaction.followup.send(
+        content=(
+            f"🏆 **World Cup Predictions: Matches {start_game} to {end_game}**\n"
+            f"Make your choices below! Use `/predict section: {section + 1}` for the next set."
+        ), 
         view=view
     )
 
@@ -460,9 +463,7 @@ async def update_scores_slash(interaction: discord.Interaction):
     conn.commit()
     await interaction.followup.send("🔄 **Leaderboard calculation complete for this server!**", ephemeral=True)
 
-# ==========================================
-# 5. SAFE BOT INITIATION
-# ==========================================
+# --- 🚀 SAFE BOT INITIATION ---
 TOKEN = os.getenv("DISCORD_TOKEN") or os.getenv("TOKEN") or os.getenv("BOT_TOKEN")
 
 if __name__ == "__main__":

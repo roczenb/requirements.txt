@@ -224,7 +224,9 @@ class MatchDropdown(discord.ui.Select):
         if self.is_unfinalized or selection == "LOCKED_PLACEHOLDER":
             msg = f"🔒 **Match Locked!** The teams for Match {match_id} haven't qualified yet."
             if used_followup: await interaction.followup.send(msg, ephemeral=True)
-            else: await interaction.channel.send(f"{interaction.user.mention} {msg}", delete_after=10)
+            else:
+                try: await interaction.user.send(msg)
+                except discord.Forbidden: print(f"❌ DM fail on locked match.")
             return
 
         current_time = datetime.now(timezone.utc)
@@ -233,7 +235,9 @@ class MatchDropdown(discord.ui.Select):
             if current_time >= match_info["kickoff"]:
                 msg = f"🔒 **Prediction Locked!** Match {match_id} started on {match_info['kickoff'].strftime('%Y-%m-%d %H:%M')} UTC."
                 if used_followup: await interaction.followup.send(msg, ephemeral=True)
-                else: await interaction.channel.send(f"{interaction.user.mention} {msg}", delete_after=10)
+                else:
+                    try: await interaction.user.send(msg)
+                    except discord.Forbidden: pass
                 return
 
         try:
@@ -252,12 +256,16 @@ class MatchDropdown(discord.ui.Select):
             
             msg = f"✅ Prediction saved: **{selection}** for Match {match_id}!"
             if used_followup: await interaction.followup.send(msg, ephemeral=True)
-            else: await interaction.channel.send(f"{interaction.user.mention} {msg}", delete_after=10)
+            else:
+                try: await interaction.user.send(msg)
+                except discord.Forbidden: pass
         except Exception as e:
             print(f"❌ SQL Execution Error: {e}")
             msg = "⚠️ Database synchronization error occurred."
             if used_followup: await interaction.followup.send(msg, ephemeral=True)
-            else: await interaction.channel.send(f"{interaction.user.mention} {msg}", delete_after=10)
+            else:
+                try: await interaction.user.send(msg)
+                except discord.Forbidden: pass
 
 class BracketSubmissionView(discord.ui.View):
     def __init__(self, start_game, end_game):
@@ -294,7 +302,9 @@ async def predict_slash(interaction: discord.Interaction, section: int = 1):
     if start_game > 104 or section < 1:
         msg = "❌ Valid sections are 1 through 21!"
         if used_followup: await interaction.followup.send(msg, ephemeral=True)
-        else: await interaction.channel.send(f"{interaction.user.mention} {msg}", delete_after=10)
+        else:
+            try: await interaction.user.send(msg)
+            except discord.Forbidden: pass
         return
     if end_game > 104:
         end_game = 104
@@ -305,7 +315,11 @@ async def predict_slash(interaction: discord.Interaction, section: int = 1):
     if used_followup:
         await interaction.followup.send(content=content, view=view)
     else:
-        await interaction.channel.send(content=f"{interaction.user.mention}\n{content}", view=view)
+        try:
+            await interaction.channel.send(content=f"{interaction.user.mention}\n{content}", view=view)
+        except discord.Forbidden:
+            try: await interaction.user.send(content=f"⚠️ Channel access forbidden. Sending submission interface directly:\n{content}", view=view)
+            except discord.Forbidden: print("❌ Fatal: Total channel blackout and DMs closed.")
 
 @bot.tree.command(name="leaderboard", description="Check the top 20 players in this server.")
 async def leaderboard_slash(interaction: discord.Interaction):
@@ -324,15 +338,23 @@ async def leaderboard_slash(interaction: discord.Interaction):
     if not rows:
         msg = "📊 No prediction records currently exist for this server."
         if used_followup: await interaction.followup.send(msg)
-        else: await interaction.channel.send(msg, delete_after=10)
+        else:
+            try: await interaction.user.send(msg)
+            except discord.Forbidden: pass
         return
 
     embed = discord.Embed(title=f"🏆 {interaction.guild.name} Standings", color=0x2b6cb0)
     for index, row in enumerate(rows, start=1):
         embed.add_field(name=f"{index}. {row[0]}", value=f"🎯 Points: {row[1]}", inline=False)
     
-    if used_followup: await interaction.followup.send(embed=embed)
-    else: await interaction.channel.send(embed=embed)
+    if used_followup: 
+        await interaction.followup.send(embed=embed)
+    else:
+        try:
+            await interaction.channel.send(embed=embed)
+        except discord.Forbidden:
+            try: await interaction.user.send(content=f"📊 Here is the leaderboard for **{interaction.guild.name}** (Channel message permissions are missing):", embed=embed)
+            except discord.Forbidden: pass
 
 @bot.tree.command(name="mypicks", description="View your saved match predictions.")
 @app_commands.describe(section="The section number to view (1-21)")
@@ -354,7 +376,9 @@ async def mypicks_slash(interaction: discord.Interaction, section: int = 1):
     if start_game > 104 or section < 1:
         msg = "❌ Valid sections are 1 through 21!"
         if used_followup: await interaction.followup.send(msg, ephemeral=True)
-        else: await interaction.channel.send(f"{interaction.user.mention} {msg}", delete_after=10)
+        else:
+            try: await interaction.user.send(msg)
+            except discord.Forbidden: pass
         return
         
     columns_to_select = ", ".join([f"m_{i}" for i in range(start_game, min(end_game + 1, 105))])
@@ -368,7 +392,9 @@ async def mypicks_slash(interaction: discord.Interaction, section: int = 1):
     if not row or all(pick is None for pick in row):
         msg = "📝 You haven't made predictions for this section yet."
         if used_followup: await interaction.followup.send(msg, ephemeral=True)
-        else: await interaction.channel.send(f"{interaction.user.mention} {msg}", delete_after=10)
+        else:
+            try: await interaction.user.send(msg)
+            except discord.Forbidden: pass
         return
         
     embed = discord.Embed(title=f"📋 Predictions Check: Matches {start_game} to {min(end_game, 104)}", color=0x38a169)
@@ -383,7 +409,13 @@ async def mypicks_slash(interaction: discord.Interaction, section: int = 1):
     if used_followup:
         await interaction.followup.send(embed=embed, ephemeral=True)
     else:
-        await interaction.channel.send(content=f"{interaction.user.mention} Here are your picks:", embed=embed, delete_after=30)
+        try:
+            await interaction.channel.send(content=f"{interaction.user.mention} Here are your picks:", embed=embed, delete_after=30)
+        except discord.Forbidden:
+            try:
+                await interaction.user.send(content="⚠️ Gateway lag/channel permission restriction encountered. Delivering your picks here via DM:", embed=embed)
+            except discord.Forbidden:
+                print(f"❌ Total blackout: Bot has no channel permissions and user has DMs closed.")
 
 @bot.tree.command(name="match", description="Look up teams and official live results for a specific match.")
 @app_commands.describe(match_num="The match number you want to look up (1-104)")
@@ -401,7 +433,14 @@ async def match_slash(interaction: discord.Interaction, match_num: int):
     embed.add_field(name="🏟️ Matchup", value=f"**{teams[0]}** vs **{teams[1]}**", inline=False)
     embed.add_field(name="🤝 Ties Allowed?", value=allow_tie, inline=True)
     embed.add_field(name="🏆 Live Result", value=f"**{result}**", inline=True)
-    await interaction.response.send_message(embed=embed)
+    
+    try:
+        await interaction.response.send_message(embed=embed)
+    except discord.errors.NotFound:
+        try: await interaction.channel.send(embed=embed)
+        except discord.Forbidden:
+            try: await interaction.user.send(embed=embed)
+            except discord.Forbidden: pass
 
 @bot.tree.command(name="help", description="Show how to play and check the point system layout.")
 async def help_slash(interaction: discord.Interaction):
@@ -418,7 +457,14 @@ async def help_slash(interaction: discord.Interaction):
         "• **Quarter & Semis:** 3 Points\n"
         "• **Finals:** 5 Points"
     ), inline=False)
-    await interaction.response.send_message(embed=embed)
+    
+    try:
+        await interaction.response.send_message(embed=embed)
+    except discord.errors.NotFound:
+        try: await interaction.channel.send(embed=embed)
+        except discord.Forbidden:
+            try: await interaction.user.send(embed=embed)
+            except discord.Forbidden: pass
 
 @bot.tree.command(name="update_scores", description="[Admin Only] Fetch live match stats and update player points.")
 @app_commands.checks.has_permissions(administrator=True)
@@ -465,7 +511,11 @@ async def update_scores_slash(interaction: discord.Interaction):
     
     msg = f"🔄 **Scores recalculated successfully!** Processed {updated_count} player brackets."
     if used_followup: await interaction.followup.send(msg, ephemeral=True)
-    else: await interaction.channel.send(msg, delete_after=15)
+    else:
+        try: await interaction.channel.send(msg, delete_after=15)
+        except discord.Forbidden:
+            try: await interaction.user.send(msg)
+            except discord.Forbidden: pass
 
 # --- 🚀 RUN BOT CONTAINER ---
 TOKEN = os.getenv("DISCORD_TOKEN") or os.getenv("BOT_TOKEN")

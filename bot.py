@@ -38,34 +38,37 @@ conn.commit()
 async def auto_update_matches():
     print("🔄 Checking for tournament updates...")
     
-    url = "YOUR_TOURNAMENT_URL_HERE"
+    url = "https://www.theguardian.com/football/world-cup-2026-fixtures"
     try:
-        response = requests.get(url)
+        response = requests.get(url, headers={"User-Agent": "Mozilla/5.0"})
         soup = BeautifulSoup(response.text, 'html.parser')
     except Exception as e:
         print(f"Update Loop Notice: {e}")
+        return
     
     fetched_matches = [
         {"id": 1, "home": "Sentinels", "away": "Fnatic"},
         {"id": 2, "home": "Winner of Match 1", "away": "TBD"}
     ]
     
-    try:
-        temp_conn = sqlite3.connect("tournament.db")
-        temp_cursor = temp_conn.cursor()
-        
-        for match in fetched_matches:
-            temp_cursor.execute("""
-                UPDATE matches 
-                SET home_team = ?, away_team = ? 
-                WHERE id = ?
-            """, (match["home"], match["away"], match["id"]))
+    # Check if tournament.db is actively used/exists before attempting update
+    if os.path.exists("tournament.db"):
+        try:
+            temp_conn = sqlite3.connect("tournament.db")
+            temp_cursor = temp_conn.cursor()
             
-        temp_conn.commit()
-        temp_conn.close()
-        print("✅ Database updated with latest bracket names!")
-    except Exception as e:
-        print(f"Tournament DB Update Notice: {e}")
+            for match in fetched_matches:
+                temp_cursor.execute("""
+                    UPDATE matches 
+                    SET home_team = ?, away_team = ? 
+                    WHERE id = ?
+                """, (match["home"], match["away"], match["id"]))
+                
+            temp_conn.commit()
+            temp_conn.close()
+            print("✅ Database updated with latest bracket names!")
+        except Exception as e:
+            print(f"Tournament DB Update Notice: {e}")
 
 # --- 📅 OFFICIAL 104-MATCH DATASET WITH TIME-LOCK TIMESTAMPS ---
 MATCHES = {
@@ -231,7 +234,7 @@ class MatchDropdown(discord.ui.Select):
             
         teams = match_info["teams"]
         
-        # 🛡️ 1. UNRESOLVED PLACEHOLDER NAME PROTECTION TRACKER
+        # 🛡️ UNRESOLVED PLACEHOLDER NAME PROTECTION TRACKER
         self.is_unfinalized = (
             "Winner" in str(teams[0]) or "Match" in str(teams[0]) or "TBD" in str(teams[0]) or
             "Winner" in str(teams[1]) or "Match" in str(teams[1]) or "TBD" in str(teams[1]) or
@@ -269,7 +272,7 @@ class MatchDropdown(discord.ui.Select):
         match_id = int(self.custom_id.split("_")[-1])
         selection = self.values[0]
 
-        # 🛡️ 2. INTERCEPT INCOMPLETE TEAM SUBMISSIONS
+        # 🛡️ INTERCEPT INCOMPLETE TEAM SUBMISSIONS
         if self.is_unfinalized or selection == "LOCKED_PLACEHOLDER":
             await interaction.followup.send(
                 f"🔒 **Match Locked!** You cannot submit a prediction for Match {match_id} yet because the real qualifying teams haven't been finalized in the bracket.",
@@ -277,7 +280,7 @@ class MatchDropdown(discord.ui.Select):
             )
             return
 
-        # --- 🕒 TIME LOCK CHECK (FIXED TIMEZONE DRIFT BUG) ---
+        # --- 🕒 TIME LOCK CHECK ---
         current_time = datetime.now(timezone.utc)
         match_info = MATCHES.get(match_id)
         if match_info and "kickoff" in match_info:
